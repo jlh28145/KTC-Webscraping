@@ -1,88 +1,138 @@
-# Dynasty Rankings Scraper
+# 🏈 Dynasty Rankings Webscraper Project
 
-This Python script automates the process of scraping dynasty rankings from [KeepTradeCut](https://keeptradecut.com). It uses Selenium to navigate through multiple pages of rankings, extracts player data, and saves the results to a CSV file.
+This project scrapes **Dynasty Rankings** data for fantasy football players and stores it in a local SQLite database. It also provides a **REST API** to query the data and a **Streamlit dashboard** for visualizing player rankings.
 
-## Features
+---
 
-- Scrapes player rankings, names, positions, teams, ages, tiers, and values.
-- Handles popups dynamically to ensure uninterrupted data extraction.
-- Supports pagination to scrape data across multiple pages.
-- Saves extracted data in a timestamped CSV file for easy access.
+## 🔧 Features
 
-## Requirements
+- 🔎 Web scraping using Selenium
+- 🧱 Local SQLite database for persistent storage
+- ⚡ REST API via FastAPI
+- 📊 Interactive dashboard with Streamlit
 
-The script uses the following Python libraries:
+---
 
-- `time`
-- `pandas`
-- `datetime`
-- `selenium`
-- `webdriver_manager`
+## 🧪 Tech Stack
 
-Ensure you have Python 3.7 or higher installed.
+| Layer         | Tech              |
+|---------------|-------------------|
+| Web Scraper   | Python + Selenium |
+| Database      | SQLite            |
+| API           | FastAPI           |
+| Dashboard     | Streamlit         |
 
-## Installation
+---
 
-1. Clone this repository:
-   ```bash
-   git clone <repository-url>
-   cd <repository-folder>
-   ```
+## 🚀 Quickstart
 
-2. Create and activate a virtual environment (optional but recommended):
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+### 1. Clone the repo
 
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/yourusername/KTC-Webscraping.git
+cd KTC-Webscraping
+```
 
-   Create a `requirements.txt` file with the following content:
-   ```
-   pandas
-   selenium
-   webdriver-manager
-   ```
+### 2. Set up environment
 
-## Usage
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-1. Update the `url` variable in the script if necessary to point to the desired page on KeepTradeCut.
+### 3. Run the scraper
 
-2. Run the script:
-   ```bash
-   python scrape_dynasty_rankings.py
-   ```
+```bash
+python src/scraper.py
+```
 
-3. The script will:
-   - Navigate through pages of rankings.
-   - Handle popups dynamically.
-   - Extract player data and save it to a timestamped CSV file.
+### 4. Run the FastAPI server
 
-4. The saved file will be located in the same directory as the script, with a filename like:
-   ```
-   dynasty_rankings_YYYYMMDD_HHMMSS.csv
-   ```
+```bash
+uvicorn src.api:app --reload
+```
 
-## Key Points
+Visit: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for Swagger UI.
 
-- The script is configured with an explicit wait of 60 seconds to ensure all elements load properly before interaction.
-- It uses dynamic selectors for elements like popups and pagination buttons.
-- By default, it scrapes 10 pages of rankings. You can adjust the number of pages by modifying the `range(10)` in the script.
+### 5. Launch the Streamlit dashboard
 
-## Debugging Tips
+```bash
+streamlit run src/dashboard.py
+```
 
-- If the script encounters issues with elements not being found, ensure the website's structure hasn't changed.
-- You can uncomment the line `chrome_options.add_argument("--headless")` to run the browser in headless mode (no UI).
-- Adjust the sleep timer (`time.sleep(5)`) to account for slower or faster page loads.
+---
 
-## Disclaimer
+## 🥪 Running Tests
 
-This script is intended for educational purposes only. Ensure you comply with the website's terms of service and avoid overloading their servers with excessive requests.
+```bash
+pytest
+```
 
-## License
+Covers scraper, database, and API layers.
 
-This project is licensed under the MIT License. See the LICENSE file for more details.
+---
+
+## 📌 API Docs
+
+### `GET /rankings`
+Retrieve all players with optional filters:
+- `tier`: int (optional)
+- `page`: int (optional)
+
+### `GET /rankings/{name}`
+Retrieve players by (partial, case-insensitive) name match.
+
+### Example
+```bash
+curl http://127.0.0.1:8000/rankings?tier=1&page=1
+```
+
+---
+
+## 📊 Example Dashboard Screenshot
+
+_(Add Streamlit dashboard screenshot here)_
+
+---
+
+## 🚣 Future Roadmap
+
+- [ ] Add historical tracking of player value
+- [ ] Dockerize the project for portability
+- [ ] Deploy dashboard via Streamlit Cloud or Hugging Face Spaces
+- [ ] Integrate with a fantasy football app or fantasy API
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+## 📃 Directory Structure
+
+```
+ktc-webscraping/
+├── app/                # FastAPI app
+│   └── main.py
+├── dashboard/          # Streamlit app
+│   └── app.py
+├── data/               # Scraped raw data (optional CSVs or logs)
+├── db/                 # SQLite database
+│   └── ktc.db
+├── src/                # Core logic
+│   ├── scraper.py
+│   ├── database.py
+│   └── utils.py
+├── tests/              # Unit tests
+├── .env                # Environment variables (URLs, DB name)
+├── requirements.txt
+├── README.md
+└── Dockerfile (optional)
+```
+
+---
+
 
