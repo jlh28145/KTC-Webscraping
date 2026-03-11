@@ -1,138 +1,59 @@
-# 🏈 Dynasty Rankings Webscraper Project
+# KTC Webscraping
 
-This project scrapes **Dynasty Rankings** data for fantasy football players and stores it in a local SQLite database. It also provides a **REST API** to query the data and a **Streamlit dashboard** for visualizing player rankings.
+Proof-of-concept project for scraping KeepTradeCut dynasty rankings into SQLite, with a small FastAPI app and Streamlit dashboard in the repo.
 
----
+## Current Baseline
 
-## 🔧 Features
+Phase 0 is now verified against the local workspace:
 
-- 🔎 Web scraping using Selenium
-- 🧱 Local SQLite database for persistent storage
-- ⚡ REST API via FastAPI
-- 📊 Interactive dashboard with Streamlit
+- Python target: `3.12` via [`.python-version`](/home/vhinson/dev/KTC-Webscraping/.python-version)
+- Local environment: `.venv`
+- Dependencies install successfully from [requirements.txt](/home/vhinson/dev/KTC-Webscraping/requirements.txt)
+- Baseline scraper entrypoint: [src/scraper.py](/home/vhinson/dev/KTC-Webscraping/src/scraper.py)
 
----
-
-## 🧪 Tech Stack
-
-| Layer         | Tech              |
-|---------------|-------------------|
-| Web Scraper   | Python + Selenium |
-| Database      | SQLite            |
-| API           | FastAPI           |
-| Dashboard     | Streamlit         |
-
----
-
-## 🚀 Quickstart
-
-### 1. Clone the repo
+## Local Setup
 
 ```bash
-git clone https://github.com/yourusername/KTC-Webscraping.git
-cd KTC-Webscraping
-```
-
-### 2. Set up environment
-
-```bash
-python -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Run the scraper
+## Baseline Run
 
 ```bash
-python src/scraper.py
+python -m src.scraper
 ```
 
-### 4. Run the FastAPI server
+Current runtime inputs:
 
-```bash
-uvicorn src.api:app --reload
-```
+- Source URL: `https://keeptradecut.com/dynasty-rankings?page=0&filters=QB|WR|RB|TE|RDP&format=2`
+- Database path: `db/ktc.db`
+- Page target: 10 pages
+- Browser dependency: local Chrome plus `webdriver-manager`
 
-Visit: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for Swagger UI.
+Current outputs:
 
-### 5. Launch the Streamlit dashboard
+- SQLite database at `db/ktc.db`
+- Table: `players`
+- Existing local baseline data: 500 rows already present in the database from a prior scrape
 
-```bash
-streamlit run src/dashboard.py
-```
+Known issues from the March 11, 2026 baseline run:
 
----
+- Dependency installation succeeds, but it requires network access to PyPI.
+- The scraper now launches Chrome and Chromedriver successfully.
+- The live scrape timed out after 120 seconds before inserting a fresh batch of rows.
+- No new `players` rows were written during the timed verification run; the latest `scraped_at` remained `2025-04-12T05:38:25.086550`.
+- The API and dashboard code exist, but they were not validated in phase 0.
 
-## 🥪 Running Tests
+## Repo Layout
 
-```bash
-pytest
-```
+- [src/scraper.py](/home/vhinson/dev/KTC-Webscraping/src/scraper.py): Selenium scraper baseline
+- [src/database.py](/home/vhinson/dev/KTC-Webscraping/src/database.py): SQLite setup and inserts
+- [app/main.py](/home/vhinson/dev/KTC-Webscraping/app/main.py): FastAPI app
+- [dashboard/dashboard.py](/home/vhinson/dev/KTC-Webscraping/dashboard/dashboard.py): Streamlit dashboard
+- [todo.md](/home/vhinson/dev/KTC-Webscraping/todo.md): implementation roadmap
 
-Covers scraper, database, and API layers.
+## Next Phase 0 Follow-up
 
----
-
-## 📌 API Docs
-
-### `GET /rankings`
-Retrieve all players with optional filters:
-- `tier`: int (optional)
-- `page`: int (optional)
-
-### `GET /rankings/{name}`
-Retrieve players by (partial, case-insensitive) name match.
-
-### Example
-```bash
-curl http://127.0.0.1:8000/rankings?tier=1&page=1
-```
-
----
-
-## 📊 Example Dashboard Screenshot
-
-_(Add Streamlit dashboard screenshot here)_
-
----
-
-## 🚣 Future Roadmap
-
-- [ ] Add historical tracking of player value
-- [ ] Dockerize the project for portability
-- [ ] Deploy dashboard via Streamlit Cloud or Hugging Face Spaces
-- [ ] Integrate with a fantasy football app or fantasy API
-
----
-
-## 📄 License
-
-MIT
-
----
-
-## 📃 Directory Structure
-
-```
-ktc-webscraping/
-├── app/                # FastAPI app
-│   └── main.py
-├── dashboard/          # Streamlit app
-│   └── app.py
-├── data/               # Scraped raw data (optional CSVs or logs)
-├── db/                 # SQLite database
-│   └── ktc.db
-├── src/                # Core logic
-│   ├── scraper.py
-│   ├── database.py
-│   └── utils.py
-├── tests/              # Unit tests
-├── .env                # Environment variables (URLs, DB name)
-├── requirements.txt
-├── README.md
-└── Dockerfile (optional)
-```
-
----
-
-
+The remaining cleanup is functional rather than setup-related: make the live scraper complete reliably, then tighten the README setup around the API and dashboard once those paths are verified.

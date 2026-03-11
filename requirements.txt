@@ -1,3 +1,7 @@
+fastapi
 pandas
+requests
 selenium
+streamlit
+uvicorn
 webdriver-manager
