@@ -1,25 +1,29 @@
-import time
+import os
+from pathlib import Path
 from datetime import datetime
 
+from bs4 import BeautifulSoup
 from selenium import webdriver
+from selenium.common.exceptions import ElementNotInteractableException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 from src.database import create_connection, insert_player_data
 
-URL = "https://keeptradecut.com/dynasty-rankings?page=0&filters=QB|WR|RB|TE|RDP&format=2"
-DB_PATH = "db/ktc.db"
-PAGE_COUNT = 10
+BASE_URL = "https://keeptradecut.com/dynasty-rankings?page={page}&filters=QB|WR|RB|TE|RDP&format=2"
+DB_PATH = Path("db/ktc.db")
+PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
+MIN_ROWS_PER_PAGE = 50
 
 
 def build_driver():
     chrome_options = Options()
-    # chrome_options.add_argument("--headless=new")
+    if os.getenv("KTC_HEADLESS", "1") != "0":
+        chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     service = Service(ChromeDriverManager().install())
@@ -32,10 +36,12 @@ def close_popup(driver):
         popup_wait = WebDriverWait(driver, 5)
         popup = popup_wait.until(EC.presence_of_element_located((By.CLASS_NAME, "modal-content")))
         close_button = popup.find_element(By.ID, "dont-know")
-        close_button.click()
+        driver.execute_script("arguments[0].click();", close_button)
         popup_wait.until(EC.invisibility_of_element(popup))
     except TimeoutException:
-        print("No popup detected.")
+        return
+    except ElementNotInteractableException:
+        return
     except Exception as exc:
         print(f"No popup detected or unable to close: {exc}")
 
@@ -54,32 +60,40 @@ def safe_int(text):
         return None
 
 
-def extract_player_data(wait):
+def optional_text(element, by, value):
+    matches = element.find_elements(by, value)
+    if not matches:
+        return None
+    return matches[0].text or None
+
+
+def parse_player_rows(page_html, scrape_timestamp):
     players = []
-    scrape_timestamp = datetime.now().isoformat()
-    rankings_table = wait.until(EC.presence_of_element_located((By.ID, "rankings-page-rankings")))
-    wait.until(lambda driver: len(rankings_table.find_elements(By.CLASS_NAME, "onePlayer")) >= 50)
-    player_rows = rankings_table.find_elements(By.CLASS_NAME, "onePlayer")
+    soup = BeautifulSoup(page_html, "html.parser")
+    player_rows = soup.select("#rankings-page-rankings .onePlayer")
 
     for row in player_rows:
         try:
-            rank = safe_int(row.find_element(By.CLASS_NAME, "rank-number").text)
-            player_name = row.find_element(By.TAG_NAME, "a").text
-            position_full = row.find_element(By.CLASS_NAME, "position").text
+            rank = safe_int(row.select_one(".rank-number").get_text(strip=True))
+            player_name = row.select_one(".player-name a").get_text(strip=True)
+            position_full = row.select_one(".position-team .position").get_text(strip=True)
 
             if "PICK" not in position_full:
-                team = row.find_element(By.CLASS_NAME, "player-team").text
-                age = safe_float(row.find_element(By.CLASS_NAME, "age").text.replace(" y.o.", ""))
+                team_node = row.select_one(".player-team")
+                team = team_node.get_text(strip=True) if team_node else None
+                age_node = row.select_one(".age")
+                age_text = age_node.get_text(strip=True) if age_node else None
+                age = safe_float(age_text.replace(" y.o.", "")) if age_text else None
                 position = "".join(filter(str.isalpha, position_full))
                 position_rank = safe_int("".join(filter(str.isdigit, position_full)))
             else:
-                team = "None"
+                team = None
                 age = None
                 position = position_full
                 position_rank = None
 
-            tier = safe_int(row.find_element(By.CLASS_NAME, "player-tier").text.replace("Tier ", ""))
-            value = safe_float(row.find_element(By.CLASS_NAME, "value").text)
+            tier = safe_int(row.select_one(".player-tier").get_text(strip=True).replace("Tier ", ""))
+            value = safe_float(row.select_one(".value").get_text(strip=True))
             players.append([rank, player_name, position, position_rank, team, age, tier, value, scrape_timestamp])
         except Exception as exc:
             print(f"Row failed: {exc}")
@@ -87,27 +101,30 @@ def extract_player_data(wait):
     return players
 
 
+def load_page(driver, wait, page_number):
+    driver.get(BASE_URL.format(page=page_number))
+    wait.until(lambda current_driver: current_driver.execute_script("return document.readyState") == "complete")
+    close_popup(driver)
+    wait.until(
+        lambda current_driver: len(current_driver.find_elements(By.CSS_SELECTOR, "#rankings-page-rankings .onePlayer"))
+        >= MIN_ROWS_PER_PAGE
+    )
+    return parse_player_rows(driver.page_source, datetime.now().isoformat())
+
+
 def main():
     conn = create_connection(DB_PATH)
     driver, wait = build_driver()
-    driver.get(URL)
-    time.sleep(5)
-    close_popup(driver)
     all_players = []
 
     try:
         for page in range(PAGE_COUNT):
             print(f"Scraping page {page + 1}")
-            all_players.extend(extract_player_data(wait))
-            try:
-                next_button = wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, ".pagination-arrow.arrow-right"))
-                )
-                driver.execute_script("arguments[0].click();", next_button)
-                wait.until(EC.presence_of_element_located((By.ID, "rankings-page-rankings")))
-            except Exception:
-                print("No more pages.")
+            page_rows = load_page(driver, wait, page)
+            if not page_rows:
+                print("No rows returned for page, stopping early.")
                 break
+            all_players.extend(page_rows)
     finally:
         driver.quit()
 

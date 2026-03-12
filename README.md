@@ -10,6 +10,7 @@ Phase 0 is now verified against the local workspace:
 - Local environment: `.venv`
 - Dependencies install successfully from [requirements.txt](/home/vhinson/dev/KTC-Webscraping/requirements.txt)
 - Baseline scraper entrypoint: [src/scraper.py](/home/vhinson/dev/KTC-Webscraping/src/scraper.py)
+- API entrypoint: [app/main.py](/home/vhinson/dev/KTC-Webscraping/app/main.py)
 
 ## Local Setup
 
@@ -25,6 +26,8 @@ pip install -r requirements.txt
 python -m src.scraper
 ```
 
+The scraper writes to a local SQLite file at `db/ktc.db`. That file is for local runtime state and should not be committed back to Git.
+
 Current runtime inputs:
 
 - Source URL: `https://keeptradecut.com/dynasty-rankings?page=0&filters=QB|WR|RB|TE|RDP&format=2`
@@ -36,15 +39,35 @@ Current outputs:
 
 - SQLite database at `db/ktc.db`
 - Table: `players`
-- Existing local baseline data: 500 rows already present in the database from a prior scrape
+- Verified full scrape result: 500 rows inserted in a single 10-page run
+- Current local database row count after verification: 1,296
 
-Known issues from the March 11, 2026 baseline run:
+Verified behavior from the March 11, 2026 repair pass:
 
 - Dependency installation succeeds, but it requires network access to PyPI.
-- The scraper now launches Chrome and Chromedriver successfully.
-- The live scrape timed out after 120 seconds before inserting a fresh batch of rows.
-- No new `players` rows were written during the timed verification run; the latest `scraped_at` remained `2025-04-12T05:38:25.086550`.
-- The API and dashboard code exist, but they were not validated in phase 0.
+- `python -m src.scraper` completes a full 10-page run successfully.
+- The scraper now uses direct page URLs and static HTML parsing to avoid Selenium pagination and stale-element failures.
+- The old duplicate scraper files were removed so there is one clear scraper entrypoint.
+- The FastAPI app now resolves the SQLite path from the repo instead of depending on the shell working directory.
+
+Current caveats:
+
+- `db/ktc.db` is still an accumulated local database, so repeated runs append more rows.
+- There is no deduplication or upsert behavior yet.
+- The Streamlit dashboard file exists, but it has only been syntax-checked, not exercised end-to-end in this phase.
+
+## Data Handling
+
+- Keep the live SQLite database local only: `db/ktc.db` is ignored by Git and treated as runtime state.
+- Keep representative sample data in the repo for docs and tests: [data/samples/players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json).
+- If you need to inspect local data, query `db/ktc.db` directly or export ad hoc snapshots outside the repo.
+- If you want historical retention later, move it to a hosted database or object storage instead of growing the Git history with binary DB files.
+
+If `db/ktc.db` or old CSV snapshots were already tracked earlier, remove them from the Git index once and keep the files locally:
+
+```bash
+git rm --cached db/ktc.db dynasty_rankings_20250412_052408.csv
+```
 
 ## Repo Layout
 
@@ -56,4 +79,4 @@ Known issues from the March 11, 2026 baseline run:
 
 ## Next Phase 0 Follow-up
 
-The remaining cleanup is functional rather than setup-related: make the live scraper complete reliably, then tighten the README setup around the API and dashboard once those paths are verified.
+The repo is now in a workable pre-phase-1 state: one scraper entrypoint, successful local scraping, and a fixed API DB path. The next step is structural refactoring, not emergency runtime repair.

@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Query
 import sqlite3
+from pathlib import Path
 from typing import List, Dict, Optional
 
 app = FastAPI()
+DB_PATH = Path(__file__).resolve().parents[1] / "db" / "ktc.db"
 
 def get_db_connection():
-    conn = sqlite3.connect("./../db/ktc.db")
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # This allows dict-like row access
     return conn
 
@@ -74,4 +76,3 @@ def get_player_by_name(name: str = Query(...)):
     conn.close()
 
     return [dict(row) for row in rows]
-

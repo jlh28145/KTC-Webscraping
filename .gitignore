@@ -9,6 +9,7 @@ __pycache__/
 .coverage
 htmlcov/
 .DS_Store
+# Local runtime data stays out of Git; checked-in fixtures live under data/samples/.
 db/*.db
 *.sqlite
 *.sqlite3
