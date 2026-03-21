@@ -20,14 +20,20 @@ Current implementation status as of March 21, 2026:
 
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
+- Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
 - A full live scrape now succeeds through the new CLI and writes to SQLite
-- Phase 2 is planned next: deterministic tests for transform, load, and CLI behavior
-- CI/CD workflow files are not implemented yet, but the codebase is now structured to support them cleanly
+- `pytest` is now part of the local workflow and ready for GitHub Actions
+- CI/CD workflow files are not implemented yet, but Phase 3 is now set up as the next step
 
 Most recent verified live run:
 
 - Command: `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Result: `500` records written to `db/ktc.db`
+
+Most recent verified test run:
+
+- Command: `./.venv/bin/python -m pytest`
+- Result: `28` tests passed
 
 ## Architecture
 
@@ -109,6 +115,7 @@ The current record shape includes:
 - `scraped_at`
 
 The current schema is intentionally simple. Historical deduplication, uniqueness rules, and upsert behavior are planned for the next persistence phase.
+The current SQLite layer now includes duplicate prevention and upsert behavior for the same `player_name` and `scraped_at` pair, while broader persistence design is still planned for a later phase.
 
 ## Quality Strategy
 
@@ -121,13 +128,21 @@ Current quality-oriented implementation choices:
 - the CLI provides a stable automation entrypoint
 - the scraper now fails loudly with useful diagnostics instead of silently reporting empty results
 - shared models make the boundaries between layers explicit
+- database behavior is covered with schema, insert, duplicate-prevention, and upsert tests
 
-Planned next quality milestones:
+Current local test coverage includes:
 
-- `pytest` coverage for transform parsing behavior
-- SQLite-focused tests for schema creation and inserts
-- CLI argument and import-safety tests
+- transform parsing behavior across legacy and current ranking layouts
+- SQLite schema creation, inserts, duplicate prevention, and upsert behavior
+- CLI argument parsing and config wiring
+- import safety for the package and legacy compatibility shim
 - regression protection for live-layout parsing edge cases
+
+Current test command:
+
+```bash
+./.venv/bin/python -m pytest
+```
 
 ## CI/CD Roadmap
 
@@ -176,7 +191,7 @@ Planned GitHub Actions scope:
 - `db/ktc.db` is local runtime state and should not be committed
 - representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json)
 - repeated scrape runs currently append rows
-- duplicate prevention and upsert behavior are planned, not finished
+- duplicate prevention and upsert behavior now exist for the current SQLite workflow
 
 ## Roadmap
 
@@ -184,7 +199,6 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 
 Immediate next phases:
 
-- Phase 2: deterministic tests
 - Phase 3: GitHub Actions CI
 - Phase 4: stronger persistence design
 - Phase 5: scheduled automation

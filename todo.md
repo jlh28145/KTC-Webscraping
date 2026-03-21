@@ -11,9 +11,11 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 
 - Phase 0 is complete
 - Phase 1 is complete
+- Phase 2 is complete
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
-- Phase 2 is the next implementation focus
+- `pytest` coverage is in place for transform, load, and CLI behavior
+- Phase 3 is the next implementation focus
 - CI/CD workflows are planned but not implemented yet
 
 ---
@@ -68,55 +70,55 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 ## Phase 2 - Build Deterministic Test Coverage
 
 ### Test setup
-- [ ] Add `pytest`
-- [ ] Create `tests/` directory
-- [ ] Add `tests/test_transform.py`
-- [ ] Add `tests/test_load.py`
-- [ ] Add `tests/test_cli.py`
-- [ ] Add `pytest.ini`
-- [ ] Add any reusable fixtures needed
-- [ ] Use sample HTML or static inputs for transform tests
+- [X] Add `pytest`
+- [X] Create `tests/` directory
+- [X] Add `tests/test_transform.py`
+- [X] Add `tests/test_load.py`
+- [X] Add `tests/test_cli.py`
+- [X] Add `pytest.ini`
+- [X] Add any reusable fixtures needed
+- [X] Use sample HTML or static inputs for transform tests
 
 ### Transform tests
-- [ ] Test successful HTML parsing
-- [ ] Test single-row parsing via `parse_player_row`
-- [ ] Test player name extraction
-- [ ] Test position extraction
-- [ ] Test overall rank extraction
-- [ ] Test position rank extraction
-- [ ] Test team extraction if available
-- [ ] Test `PICK` rows keep `position_rank` and team empty as expected
-- [ ] Test normalization of whitespace / formatting
-- [ ] Test malformed row handling
-- [ ] Test missing value handling
-- [ ] Test deterministic output shape
-- [ ] Test `PlayerRecord` field values and types
-- [ ] Test duplicate row handling if relevant in transform layer
+- [X] Test successful HTML parsing
+- [X] Test single-row parsing via `parse_player_row`
+- [X] Test player name extraction
+- [X] Test position extraction
+- [X] Test overall rank extraction
+- [X] Test position rank extraction
+- [X] Test team extraction if available
+- [X] Test `PICK` rows keep `position_rank` and team empty as expected
+- [X] Test normalization of whitespace / formatting
+- [X] Test malformed row handling
+- [X] Test missing value handling
+- [X] Test deterministic output shape
+- [X] Test `PlayerRecord` field values and types
+- [X] Test duplicate row handling if relevant in transform layer
 
 ### CLI and import safety tests
-- [ ] Test CLI argument parsing
-- [ ] Test config creation from CLI args
-- [ ] Test modules import without executing Selenium or a scrape
-- [ ] Test legacy `src.scraper` shim still resolves the package CLI entrypoint
+- [X] Test CLI argument parsing
+- [X] Test config creation from CLI args
+- [X] Test modules import without executing Selenium or a scrape
+- [X] Test legacy `src.scraper` shim still resolves the package CLI entrypoint
 
 ### Load tests
-- [ ] Set up SQLite-based tests
-- [ ] Test table creation
-- [ ] Test insert behavior
-- [ ] Test inserts from `PlayerRecord` instances
-- [ ] Test upsert behavior
-- [ ] Test duplicate prevention
-- [ ] Test expected schema constraints
-- [ ] Test scrape date persistence
-- [ ] Test float persistence for `age` and `value`
-- [ ] Test behavior on empty inputs
+- [X] Set up SQLite-based tests
+- [X] Test table creation
+- [X] Test insert behavior
+- [X] Test inserts from `PlayerRecord` instances
+- [X] Test upsert behavior
+- [X] Test duplicate prevention
+- [X] Test expected schema constraints
+- [X] Test scrape date persistence
+- [X] Test float persistence for `age` and `value`
+- [X] Test behavior on empty inputs
 
 ### Test quality
-- [ ] Keep tests focused on logic, not browser behavior
-- [ ] Avoid brittle end-to-end Selenium assertions in CI
-- [ ] Use realistic fixture data
-- [ ] Make failures easy to understand
-- [ ] Keep naming clean and consistent
+- [X] Keep tests focused on logic, not browser behavior
+- [X] Avoid brittle end-to-end Selenium assertions in CI
+- [X] Use realistic fixture data
+- [X] Make failures easy to understand
+- [X] Keep naming clean and consistent
 
 **Definition of done**
 - `pytest` runs locally
