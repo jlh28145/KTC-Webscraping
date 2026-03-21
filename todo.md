@@ -7,6 +7,15 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - database-backed persistence
 - maintainable engineering practices
 
+## Current Status
+
+- Phase 0 is complete
+- Phase 1 is complete
+- Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
+- Most recent verified full run inserted `500` records into `db/ktc.db`
+- Phase 2 is the next implementation focus
+- CI/CD workflows are planned but not implemented yet
+
 ---
 
 ## Phase 0 - Activate the Repo
@@ -31,27 +40,28 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 
 ## Phase 1 - Refactor into a Real Project Structure
 
-- [ ] Create package structure:
-  - [ ] `ktc_webscraping/extract.py`
-  - [ ] `ktc_webscraping/transform.py`
-  - [ ] `ktc_webscraping/load.py`
-  - [ ] `ktc_webscraping/cli.py`
-  - [ ] `ktc_webscraping/models.py`
-- [ ] Move Selenium scraping logic into `extract.py`
-- [ ] Move parsing and cleaning logic into `transform.py`
-- [ ] Move persistence logic into `load.py`
-- [ ] Create a command-line entrypoint in `cli.py`
-- [ ] Define record shape / schema in `models.py`
-- [ ] Remove script-level side effects where possible
-- [ ] Make transform functions pure and deterministic
-- [ ] Pass data between layers using clear structures
-- [ ] Ensure modules are importable without executing the scraper
-- [ ] Keep file and function names readable and professional
+- [X] Create package structure:
+  - [X] `ktc_webscraping/extract.py`
+  - [X] `ktc_webscraping/transform.py`
+  - [X] `ktc_webscraping/load.py`
+  - [X] `ktc_webscraping/cli.py`
+  - [X] `ktc_webscraping/models.py`
+- [X] Move Selenium scraping logic into `extract.py`
+- [X] Move parsing and cleaning logic into `transform.py`
+- [X] Move persistence logic into `load.py`
+- [X] Create a command-line entrypoint in `cli.py`
+- [X] Define record shape / schema in `models.py`
+- [X] Remove script-level side effects where possible
+- [X] Make transform functions pure and deterministic
+- [X] Pass data between layers using clear structures
+- [X] Ensure modules are importable without executing the scraper
+- [X] Keep file and function names readable and professional
 
 **Definition of done**
 - Extraction, transform, and load logic are separated
 - Transform layer can be tested without Selenium
 - Repo looks like an actual engineering project, not a loose script pile
+- Full live scrape succeeds through the package CLI
 
 ---
 
@@ -62,31 +72,43 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - [ ] Create `tests/` directory
 - [ ] Add `tests/test_transform.py`
 - [ ] Add `tests/test_load.py`
+- [ ] Add `tests/test_cli.py`
 - [ ] Add `pytest.ini`
 - [ ] Add any reusable fixtures needed
 - [ ] Use sample HTML or static inputs for transform tests
 
 ### Transform tests
 - [ ] Test successful HTML parsing
+- [ ] Test single-row parsing via `parse_player_row`
 - [ ] Test player name extraction
 - [ ] Test position extraction
 - [ ] Test overall rank extraction
 - [ ] Test position rank extraction
 - [ ] Test team extraction if available
+- [ ] Test `PICK` rows keep `position_rank` and team empty as expected
 - [ ] Test normalization of whitespace / formatting
 - [ ] Test malformed row handling
 - [ ] Test missing value handling
 - [ ] Test deterministic output shape
+- [ ] Test `PlayerRecord` field values and types
 - [ ] Test duplicate row handling if relevant in transform layer
+
+### CLI and import safety tests
+- [ ] Test CLI argument parsing
+- [ ] Test config creation from CLI args
+- [ ] Test modules import without executing Selenium or a scrape
+- [ ] Test legacy `src.scraper` shim still resolves the package CLI entrypoint
 
 ### Load tests
 - [ ] Set up SQLite-based tests
 - [ ] Test table creation
 - [ ] Test insert behavior
+- [ ] Test inserts from `PlayerRecord` instances
 - [ ] Test upsert behavior
 - [ ] Test duplicate prevention
 - [ ] Test expected schema constraints
 - [ ] Test scrape date persistence
+- [ ] Test float persistence for `age` and `value`
 - [ ] Test behavior on empty inputs
 
 ### Test quality
@@ -104,6 +126,8 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 ---
 
 ## Phase 3 - Add CI with GitHub Actions
+
+Purpose: turn the current refactor plus deterministic tests into visible, recruiter-friendly proof of CI discipline.
 
 - [ ] Create `.github/workflows/ci.yml`
 - [ ] Trigger workflow on push
@@ -212,26 +236,26 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 ## Phase 8 - Improve README for Remote Job Positioning
 
 ### README core sections
-- [ ] Add project overview
-- [ ] Add architecture summary
-- [ ] Add ETL flow explanation
-- [ ] Add testing strategy section
-- [ ] Add CI/CD section
+- [X] Add project overview
+- [X] Add architecture summary
+- [X] Add ETL flow explanation
+- [X] Add testing strategy section
+- [X] Add CI/CD section
 - [ ] Add scheduling / automation section
-- [ ] Add database persistence section
-- [ ] Add setup instructions
-- [ ] Add local run instructions
+- [X] Add database persistence section
+- [X] Add setup instructions
+- [X] Add local run instructions
 - [ ] Add test run instructions
 - [ ] Add workflow overview
-- [ ] Add future enhancements section
+- [X] Add future enhancements section
 
 ### README positioning
-- [ ] Frame the project as an automation engineering artifact
-- [ ] Emphasize deterministic validation
+- [X] Frame the project as an automation engineering artifact
+- [X] Emphasize deterministic validation
 - [ ] Emphasize CI/CD enforcement
-- [ ] Emphasize maintainability and modularity
-- [ ] Use language that maps to remote QA / SDET roles
-- [ ] Avoid overselling Selenium as the headline achievement
+- [X] Emphasize maintainability and modularity
+- [X] Use language that maps to remote QA / SDET roles
+- [X] Avoid overselling Selenium as the headline achievement
 
 **Definition of done**
 - A recruiter or hiring manager can understand the project in 2 to 3 minutes
