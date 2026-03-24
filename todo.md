@@ -15,8 +15,9 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
 - `pytest` coverage is in place for transform, load, and CLI behavior
+- Initial GitHub Actions CI workflow has been added
 - Phase 3 is the next implementation focus
-- CI/CD workflows are planned but not implemented yet
+- CI verification in GitHub is the next checkpoint
 
 ---
 
@@ -131,14 +132,14 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 
 Purpose: turn the current refactor plus deterministic tests into visible, recruiter-friendly proof of CI discipline.
 
-- [ ] Create `.github/workflows/ci.yml`
-- [ ] Trigger workflow on push
-- [ ] Trigger workflow on pull request
-- [ ] Add repository checkout step
-- [ ] Add Python setup step
-- [ ] Add dependency installation step
-- [ ] Add test execution step
-- [ ] Fail workflow when tests fail
+- [X] Create `.github/workflows/ci.yml`
+- [X] Trigger workflow on push
+- [X] Trigger workflow on pull request
+- [X] Add repository checkout step
+- [X] Add Python setup step
+- [X] Add dependency installation step
+- [X] Add test execution step
+- [X] Fail workflow when tests fail
 - [ ] Verify workflow passes from a clean environment
 
 ### Optional CI upgrades

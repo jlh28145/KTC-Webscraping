@@ -23,7 +23,8 @@ Current implementation status as of March 21, 2026:
 - Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
 - A full live scrape now succeeds through the new CLI and writes to SQLite
 - `pytest` is now part of the local workflow and ready for GitHub Actions
-- CI/CD workflow files are not implemented yet, but Phase 3 is now set up as the next step
+- An initial GitHub Actions CI workflow now exists for automated test validation
+- The next checkpoint is verifying that workflow from a clean GitHub Actions run
 
 Most recent verified live run:
 
@@ -166,6 +167,10 @@ Planned GitHub Actions scope:
 - automated test execution
 - failure on regression
 - later additions such as linting, coverage reporting, and scheduled scrape runs
+
+Current workflow file:
+
+- [ci.yml](/home/vhinson/dev/KTC-Webscraping/.github/workflows/ci.yml): runs `pytest` on push and pull request using Python `3.12`
 
 ## Repository Layout
 
