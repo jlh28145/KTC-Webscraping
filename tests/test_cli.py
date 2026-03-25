@@ -50,11 +50,13 @@ def test_run_uses_load_and_extract_layers(monkeypatch, tmp_path: Path, capsys) -
     )
     players = [
         PlayerRecord(
-            rank=1,
+            scrape_date="2026-03-21",
             player_name="Josh Allen",
             position="QB",
-            position_rank=1,
+            rank_overall=1,
+            rank_position=1,
             team="BUF",
+            source="keeptradecut",
             age=29.8,
             tier=1,
             value=9989.0,

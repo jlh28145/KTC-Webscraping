@@ -26,7 +26,7 @@ def read_rankings(
     cursor = conn.cursor()
 
     # Build dynamic WHERE clause
-    query = "SELECT * FROM players"
+    query = "SELECT * FROM ktc_rankings"
     filters = []
     values = []
 
@@ -43,7 +43,7 @@ def read_rankings(
     if filters:
         query += " WHERE " + " AND ".join(filters)
 
-    query += " ORDER BY rank ASC"
+    query += " ORDER BY scrape_date DESC, rank_overall ASC"
 
     # Pagination logic
     offset = (page - 1) * limit
@@ -62,7 +62,7 @@ def read_rankings(
 def get_player_by_id(player_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM players WHERE id = ?", (player_id,))
+    cursor.execute("SELECT * FROM ktc_rankings WHERE id = ?", (player_id,))
     row = cursor.fetchone()
     conn.close()
 
@@ -76,7 +76,15 @@ def get_player_by_id(player_id: int):
 def get_player_by_name(name: str = Query(...)):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM players WHERE LOWER(player_name) LIKE LOWER(?)", (f"%{name}%",))
+    cursor.execute(
+        """
+        SELECT *
+        FROM ktc_rankings
+        WHERE LOWER(player_name) LIKE LOWER(?)
+        ORDER BY scrape_date DESC, rank_overall ASC
+        """,
+        (f"%{name}%",),
+    )
     rows = cursor.fetchall()
     conn.close()
 
