@@ -4,11 +4,13 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class PlayerRecord:
-    rank: int | None
+    scrape_date: str
     player_name: str
     position: str
-    position_rank: int | None
+    rank_overall: int | None
+    rank_position: int | None
     team: str | None
+    source: str
     age: float | None
     tier: int | None
     value: float | None

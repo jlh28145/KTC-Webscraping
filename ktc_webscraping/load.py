@@ -6,11 +6,13 @@ from .models import PlayerRecord
 
 def player_to_row(player: PlayerRecord) -> tuple:
     return (
-        player.rank,
+        player.scrape_date,
         player.player_name,
         player.position,
-        player.position_rank,
+        player.rank_overall,
+        player.rank_position,
         player.team,
+        player.source,
         player.age,
         player.tier,
         player.value,
@@ -26,13 +28,15 @@ def create_connection(db_file: Path | str) -> sqlite3.Connection:
     cursor = conn.cursor()
     cursor.execute(
         """
-        CREATE TABLE IF NOT EXISTS players (
+        CREATE TABLE IF NOT EXISTS ktc_rankings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            rank INTEGER,
+            scrape_date TEXT NOT NULL,
             player_name TEXT,
             position TEXT,
-            position_rank INTEGER,
+            rank_overall INTEGER,
+            rank_position INTEGER,
             team TEXT,
+            source TEXT NOT NULL,
             age REAL,
             tier INTEGER,
             value REAL,
@@ -42,8 +46,8 @@ def create_connection(db_file: Path | str) -> sqlite3.Connection:
     )
     cursor.execute(
         """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_players_player_name_scraped_at
-        ON players (player_name, scraped_at)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_ktc_rankings_scrape_date_player_source
+        ON ktc_rankings (scrape_date, player_name, source)
         """
     )
     conn.commit()
@@ -54,13 +58,25 @@ def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) ->
     cursor = conn.cursor()
     cursor.executemany(
         """
-        INSERT INTO players
-        (rank, player_name, position, position_rank, team, age, tier, value, scraped_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(player_name, scraped_at) DO UPDATE SET
-            rank = excluded.rank,
+        INSERT INTO ktc_rankings
+        (
+            scrape_date,
+            player_name,
+            position,
+            rank_overall,
+            rank_position,
+            team,
+            source,
+            age,
+            tier,
+            value,
+            scraped_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(scrape_date, player_name, source) DO UPDATE SET
             position = excluded.position,
-            position_rank = excluded.position_rank,
+            rank_overall = excluded.rank_overall,
+            rank_position = excluded.rank_position,
             team = excluded.team,
             age = excluded.age,
             tier = excluded.tier,

@@ -13,13 +13,15 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Phase 1 is complete
 - Phase 2 is complete
 - Phase 3 is complete
+- Phase 4 is complete
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
 - `pytest` coverage is in place for transform, load, and CLI behavior
 - GitHub Actions CI is active and green
 - Ruff and coverage checks are part of the CI workflow
 - Current local CI-equivalent validation passes with 28 tests and 94% coverage
-- Phase 4 is the next implementation focus
+- Historical SQLite persistence is now modeled through `ktc_rankings`
+- Phase 5 is the next implementation focus
 
 ---
 
@@ -160,21 +162,21 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 
 ## Phase 4 - Add Local Database Persistence
 
-- [ ] Create initial SQLite database integration
-- [ ] Define `ktc_rankings` schema with fields such as:
-  - [ ] `scrape_date`
-  - [ ] `player_name`
-  - [ ] `position`
-  - [ ] `rank_overall`
-  - [ ] `rank_position`
-  - [ ] `team`
-  - [ ] `source`
-- [ ] Decide on primary key or uniqueness logic
-- [ ] Implement insert / upsert strategy
-- [ ] Prevent duplicate records for the same scrape date and player
-- [ ] Verify historical rows can accumulate over time
-- [ ] Add configuration for local DB path
-- [ ] Document how to inspect the SQLite database locally
+- [X] Create initial SQLite database integration
+- [X] Define `ktc_rankings` schema with fields such as:
+  - [X] `scrape_date`
+  - [X] `player_name`
+  - [X] `position`
+  - [X] `rank_overall`
+  - [X] `rank_position`
+  - [X] `team`
+  - [X] `source`
+- [X] Decide on primary key or uniqueness logic
+- [X] Implement insert / upsert strategy
+- [X] Prevent duplicate records for the same scrape date and player
+- [X] Verify historical rows can accumulate over time
+- [X] Add configuration for local DB path
+- [X] Document how to inspect the SQLite database locally
 
 **Definition of done**
 - Data is stored in a structured database

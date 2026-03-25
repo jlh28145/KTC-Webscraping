@@ -66,11 +66,13 @@ def text_layout_html() -> str:
 @pytest.fixture
 def sample_player(scrape_timestamp: str) -> PlayerRecord:
     return PlayerRecord(
-        rank=1,
+        scrape_date="2026-03-21",
         player_name="Josh Allen",
         position="QB",
-        position_rank=1,
+        rank_overall=1,
+        rank_position=1,
         team="BUF",
+        source="keeptradecut",
         age=29.8,
         tier=1,
         value=9989.0,

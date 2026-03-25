@@ -23,6 +23,7 @@ Current implementation status as of March 25, 2026:
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
 - Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
+- Phase 4 is complete: SQLite persistence now uses a historical `ktc_rankings` schema
 - A full live scrape now succeeds through the new CLI and writes to SQLite
 - `pytest` is now part of the local workflow and enforced in GitHub Actions
 - GitHub Actions CI is active and passing on the repository
@@ -36,7 +37,7 @@ Most recent verified live run:
 Most recent verified test run:
 
 - Command: `./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90`
-- Result: `28` tests passed with `94%` coverage across the CI-scoped package modules
+- Result: local validation command remains aligned with CI, and Phase 4 tests pass locally
 
 ## Architecture
 
@@ -101,24 +102,26 @@ Backwards-compatible legacy entrypoint:
 The scraper writes to:
 
 - SQLite database: `db/ktc.db`
-- Table: `players`
+- Table: `ktc_rankings`
 
 ## Data Model
 
 The current record shape includes:
 
-- `rank`
+- `scrape_date`
 - `player_name`
 - `position`
-- `position_rank`
+- `rank_overall`
+- `rank_position`
 - `team`
+- `source`
 - `age`
 - `tier`
 - `value`
 - `scraped_at`
 
-The current schema is intentionally simple. Historical deduplication, uniqueness rules, and upsert behavior are planned for the next persistence phase.
-The current SQLite layer now includes duplicate prevention and upsert behavior for the same `player_name` and `scraped_at` pair, while broader persistence design is still planned for a later phase.
+The SQLite persistence layer now stores historical ranking snapshots in `ktc_rankings`.
+The uniqueness rule is based on `scrape_date`, `player_name`, and `source`, which allows historical rows to accumulate across days while preventing duplicates within the same scrape-date snapshot.
 
 ## Quality Strategy
 
@@ -132,6 +135,7 @@ Current quality-oriented implementation choices:
 - the scraper now fails loudly with useful diagnostics instead of silently reporting empty results
 - shared models make the boundaries between layers explicit
 - database behavior is covered with schema, insert, duplicate-prevention, and upsert tests
+- historical snapshot behavior is covered in SQLite tests
 - CI now enforces lint, format, and minimum coverage gates on every change
 
 Current local test coverage includes:
@@ -209,8 +213,15 @@ Current workflow file:
 
 - `db/ktc.db` is local runtime state and should not be committed
 - representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json)
-- repeated scrape runs currently append rows
-- duplicate prevention and upsert behavior now exist for the current SQLite workflow
+- repeated scrape runs on different dates accumulate historical rows in `ktc_rankings`
+- duplicate prevention and upsert behavior apply within the same `scrape_date` and `source`
+
+Inspect the local database:
+
+```bash
+sqlite3 db/ktc.db ".tables"
+sqlite3 db/ktc.db "SELECT scrape_date, player_name, rank_overall, rank_position, team FROM ktc_rankings ORDER BY scrape_date DESC, rank_overall ASC LIMIT 20;"
+```
 
 ## Roadmap
 
@@ -218,9 +229,9 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 
 Immediate next phases:
 
-- Phase 4: stronger persistence design
 - Phase 5: scheduled automation
 - Phase 6: hosted database readiness
+- Phase 7: CLI and developer experience polish
 
 ## Resume-Style Talking Points
 

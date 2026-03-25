@@ -57,11 +57,13 @@ def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
             age = safe_float(age_text.replace(" y.o.", ""))
 
     return PlayerRecord(
-        rank=safe_int(rank_node.get_text(strip=True)),
+        scrape_date=scrape_timestamp.split("T", maxsplit=1)[0],
         player_name=name_node.get_text(strip=True),
         position=position,
-        position_rank=position_rank,
+        rank_overall=safe_int(rank_node.get_text(strip=True)),
+        rank_position=position_rank,
         team=team,
+        source="keeptradecut",
         age=age,
         tier=safe_int(tier_node.get_text(strip=True).replace("Tier ", "")),
         value=safe_float(value_node.get_text(strip=True)),
@@ -99,11 +101,13 @@ def parse_player_text_lines(lines: list[str], scrape_timestamp: str) -> PlayerRe
 
     if position_text == "PICK":
         return PlayerRecord(
-            rank=rank,
+            scrape_date=scrape_timestamp.split("T", maxsplit=1)[0],
             player_name=player_name,
             position="PICK",
-            position_rank=None,
+            rank_overall=rank,
+            rank_position=None,
             team=team,
+            source="keeptradecut",
             age=None,
             tier=tier,
             value=value,
@@ -117,11 +121,13 @@ def parse_player_text_lines(lines: list[str], scrape_timestamp: str) -> PlayerRe
 
     position, position_rank = normalize_position(position_text)
     return PlayerRecord(
-        rank=rank,
+        scrape_date=scrape_timestamp.split("T", maxsplit=1)[0],
         player_name=player_name,
         position=position,
-        position_rank=position_rank,
+        rank_overall=rank,
+        rank_position=position_rank,
         team=team,
+        source="keeptradecut",
         age=age,
         tier=tier,
         value=value,

@@ -39,11 +39,13 @@ def test_parse_player_row_from_legacy_html(legacy_row_html: str, scrape_timestam
     record = parse_player_row(row, scrape_timestamp)
 
     assert record == PlayerRecord(
-        rank=1,
+        scrape_date="2026-03-21",
         player_name="Josh Allen",
         position="QB",
-        position_rank=1,
+        rank_overall=1,
+        rank_position=1,
         team="BUF",
+        source="keeptradecut",
         age=29.8,
         tier=1,
         value=9989.0,
@@ -66,11 +68,13 @@ def test_parse_player_text_lines_handles_standard_player(scrape_timestamp: str) 
     record = parse_player_text_lines(lines, scrape_timestamp)
 
     assert record == PlayerRecord(
-        rank=1,
+        scrape_date="2026-03-21",
         player_name="Bijan Robinson",
         position="RB",
-        position_rank=1,
+        rank_overall=1,
+        rank_position=1,
         team="ATL",
+        source="keeptradecut",
         age=24.1,
         tier=1,
         value=9999.0,
@@ -84,11 +88,13 @@ def test_parse_player_text_lines_handles_pick_rows(scrape_timestamp: str) -> Non
     record = parse_player_text_lines(lines, scrape_timestamp)
 
     assert record == PlayerRecord(
-        rank=2,
+        scrape_date="2026-03-21",
         player_name="2027 Early 1st",
         position="PICK",
-        position_rank=None,
+        rank_overall=2,
+        rank_position=None,
         team="FA",
+        source="keeptradecut",
         age=None,
         tier=5,
         value=6810.0,
@@ -114,7 +120,7 @@ def test_parse_player_text_lines_normalizes_whitespace(scrape_timestamp: str) ->
     assert record.player_name == "Ja'Marr Chase"
     assert record.team == "CIN"
     assert record.position == "WR"
-    assert record.position_rank == 1
+    assert record.rank_position == 1
 
 
 def test_parse_player_text_lines_returns_none_for_missing_tier(scrape_timestamp: str) -> None:
@@ -143,7 +149,7 @@ def test_extract_rankings_text_lines_and_parse_current_layout(
     assert records[0].player_name == "Bijan Robinson"
     assert records[0].team == "ATL"
     assert records[1].position == "PICK"
-    assert records[1].position_rank is None
+    assert records[1].rank_position is None
     assert records[1].team == "FA"
 
 
