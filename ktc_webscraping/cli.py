@@ -2,7 +2,12 @@ import argparse
 import os
 from pathlib import Path
 
-from .extract import DEFAULT_BASE_URL, DEFAULT_MIN_ROWS_PER_PAGE, DEFAULT_PAGE_COUNT, scrape_rankings
+from .extract import (
+    DEFAULT_BASE_URL,
+    DEFAULT_MIN_ROWS_PER_PAGE,
+    DEFAULT_PAGE_COUNT,
+    scrape_rankings,
+)
 from .load import create_connection, insert_player_data
 from .models import ScrapeConfig
 
@@ -20,9 +25,23 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Scrape KeepTradeCut rankings into SQLite.")
-    parser.add_argument("--page-count", type=int, default=DEFAULT_PAGE_COUNT, help="Number of ranking pages to scrape.")
-    parser.add_argument("--db-path", type=Path, default=DEFAULT_DB_PATH, help="SQLite database destination.")
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Ranking URL template with a {page} placeholder.")
+    parser.add_argument(
+        "--page-count",
+        type=int,
+        default=DEFAULT_PAGE_COUNT,
+        help="Number of ranking pages to scrape.",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=Path,
+        default=DEFAULT_DB_PATH,
+        help="SQLite database destination.",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=DEFAULT_BASE_URL,
+        help="Ranking URL template with a {page} placeholder.",
+    )
     parser.add_argument(
         "--min-rows-per-page",
         type=int,

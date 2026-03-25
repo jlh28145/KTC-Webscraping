@@ -8,17 +8,23 @@ from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
 )
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
 from .models import PlayerRecord, ScrapeConfig
-from .transform import parse_player_rows, parse_player_rows_from_text, parse_player_text_lines
+from .transform import (
+    parse_player_rows,
+    parse_player_rows_from_text,
+    parse_player_text_lines,
+)
 
-DEFAULT_BASE_URL = "https://keeptradecut.com/dynasty-rankings?page={page}&filters=QB|WR|RB|TE|RDP&format=2"
+DEFAULT_BASE_URL = (
+    "https://keeptradecut.com/dynasty-rankings?page={page}&filters=QB|WR|RB|TE|RDP&format=2"
+)
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
 
@@ -71,16 +77,26 @@ def close_popup(driver: webdriver.Chrome) -> None:
         return
 
 
-def wait_for_rankings(driver: webdriver.Chrome, wait: WebDriverWait, min_rows_per_page: int) -> None:
-    wait.until(lambda current_driver: current_driver.execute_script("return document.readyState") == "complete")
+def wait_for_rankings(
+    driver: webdriver.Chrome, wait: WebDriverWait, min_rows_per_page: int
+) -> None:
+    wait.until(
+        lambda current_driver: (
+            current_driver.execute_script("return document.readyState") == "complete"
+        )
+    )
     close_popup(driver)
 
     try:
         wait.until(
-            lambda current_driver: len(
-                current_driver.find_elements(By.CSS_SELECTOR, "#rankings-page-rankings .onePlayer")
+            lambda current_driver: (
+                len(
+                    current_driver.find_elements(
+                        By.CSS_SELECTOR, "#rankings-page-rankings .onePlayer"
+                    )
+                )
+                >= min_rows_per_page
             )
-            >= min_rows_per_page
         )
     except TimeoutException as exc:
         page_source = driver.page_source
@@ -124,7 +140,9 @@ def extract_page_records(
     dom_records = [
         record
         for record in (
-            parse_player_text_lines(row.text.splitlines(), scrape_timestamp) for row in row_elements if row.text.strip()
+            parse_player_text_lines(row.text.splitlines(), scrape_timestamp)
+            for row in row_elements
+            if row.text.strip()
         )
         if record is not None
     ]
