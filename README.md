@@ -103,6 +103,7 @@ The scraper writes to:
 
 - SQLite database: `db/ktc.db`
 - Table: `ktc_rankings`
+- Legacy `players` table: retired
 
 ## Data Model
 
@@ -215,6 +216,7 @@ Current workflow file:
 - representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json)
 - repeated scrape runs on different dates accumulate historical rows in `ktc_rankings`
 - duplicate prevention and upsert behavior apply within the same `scrape_date` and `source`
+- legacy `players` tables are automatically retired when the current load layer initializes the database
 
 Inspect the local database:
 

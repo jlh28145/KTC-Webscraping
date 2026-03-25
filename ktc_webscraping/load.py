@@ -50,6 +50,8 @@ def create_connection(db_file: Path | str) -> sqlite3.Connection:
         ON ktc_rankings (scrape_date, player_name, source)
         """
     )
+    cursor.execute("DROP TABLE IF EXISTS players")
+    cursor.execute("DROP INDEX IF EXISTS idx_players_player_name_scraped_at")
     conn.commit()
     return conn
 

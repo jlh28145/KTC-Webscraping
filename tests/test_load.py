@@ -52,6 +52,36 @@ def test_create_connection_creates_unique_index_for_scrape_date_player_and_sourc
     )
 
 
+def test_create_connection_retires_legacy_players_table(temp_db_path) -> None:
+    conn = sqlite3.connect(temp_db_path)
+    conn.execute("CREATE TABLE players (id INTEGER PRIMARY KEY, player_name TEXT)")
+    conn.execute(
+        "CREATE UNIQUE INDEX idx_players_player_name_scraped_at ON players (player_name, id)"
+    )
+    conn.commit()
+    conn.close()
+
+    conn = create_connection(temp_db_path)
+    legacy_table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players'"
+    ).fetchone()
+    legacy_index = conn.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'index' AND name = 'idx_players_player_name_scraped_at'
+        """
+    ).fetchone()
+    rankings_table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ktc_rankings'"
+    ).fetchone()
+    conn.close()
+
+    assert legacy_table is None
+    assert legacy_index is None
+    assert rankings_table == ("ktc_rankings",)
+
+
 def test_insert_player_data_persists_player_records(
     temp_db_path, sample_player: PlayerRecord
 ) -> None:
