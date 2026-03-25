@@ -52,7 +52,9 @@ def test_parse_player_row_from_legacy_html(legacy_row_html: str, scrape_timestam
 
 
 def test_parse_player_row_returns_none_for_malformed_row(scrape_timestamp: str) -> None:
-    soup = BeautifulSoup("<div class='onePlayer'><div class='rank-number'>1</div></div>", "html.parser")
+    soup = BeautifulSoup(
+        "<div class='onePlayer'><div class='rank-number'>1</div></div>", "html.parser"
+    )
     row = soup.select_one(".onePlayer")
 
     assert parse_player_row(row, scrape_timestamp) is None
@@ -95,7 +97,16 @@ def test_parse_player_text_lines_handles_pick_rows(scrape_timestamp: str) -> Non
 
 
 def test_parse_player_text_lines_normalizes_whitespace(scrape_timestamp: str) -> None:
-    lines = ["  3  ", "  Ja'Marr Chase  ", " CIN ", " WR1 ", " 26.0 y.o. ", " Tier 2 ", " 2 ", " 9770 "]
+    lines = [
+        "  3  ",
+        "  Ja'Marr Chase  ",
+        " CIN ",
+        " WR1 ",
+        " 26.0 y.o. ",
+        " Tier 2 ",
+        " 2 ",
+        " 9770 ",
+    ]
 
     record = parse_player_text_lines(lines, scrape_timestamp)
 
@@ -112,14 +123,18 @@ def test_parse_player_text_lines_returns_none_for_missing_tier(scrape_timestamp:
     assert parse_player_text_lines(lines, scrape_timestamp) is None
 
 
-def test_parse_player_rows_uses_legacy_html_when_available(legacy_row_html: str, scrape_timestamp: str) -> None:
+def test_parse_player_rows_uses_legacy_html_when_available(
+    legacy_row_html: str, scrape_timestamp: str
+) -> None:
     records = parse_player_rows(legacy_row_html, scrape_timestamp)
 
     assert len(records) == 1
     assert records[0].player_name == "Josh Allen"
 
 
-def test_extract_rankings_text_lines_and_parse_current_layout(text_layout_html: str, scrape_timestamp: str) -> None:
+def test_extract_rankings_text_lines_and_parse_current_layout(
+    text_layout_html: str, scrape_timestamp: str
+) -> None:
     lines = extract_rankings_text_lines(text_layout_html)
 
     records = parse_player_rows_from_text(lines, scrape_timestamp)
@@ -132,7 +147,9 @@ def test_extract_rankings_text_lines_and_parse_current_layout(text_layout_html: 
     assert records[1].team == "FA"
 
 
-def test_parse_player_rows_falls_back_to_current_text_layout(text_layout_html: str, scrape_timestamp: str) -> None:
+def test_parse_player_rows_falls_back_to_current_text_layout(
+    text_layout_html: str, scrape_timestamp: str
+) -> None:
     records = parse_player_rows(text_layout_html, scrape_timestamp)
 
     assert len(records) == 2

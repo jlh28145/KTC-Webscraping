@@ -1,5 +1,7 @@
 # KTC Webscraping
 
+[![CI](https://github.com/jlh28145/KTC-Webscraping/actions/workflows/ci.yml/badge.svg)](https://github.com/jlh28145/KTC-Webscraping/actions/workflows/ci.yml)
+
 `KTC Webscraping` is a portfolio ETL project built around scraping KeepTradeCut dynasty rankings, normalizing the results, and persisting them into SQLite for downstream API and dashboard use.
 
 The project is being developed intentionally as a proof repo for remote QA, SDET, and Quality Engineering roles. The goal is not just to scrape data, but to show engineering habits that translate well to production systems: layered design, deterministic parsing, testability, automation readiness, and a clear path to CI/CD.
@@ -16,15 +18,15 @@ This repo is meant to demonstrate:
 
 ## Current Status
 
-Current implementation status as of March 21, 2026:
+Current implementation status as of March 25, 2026:
 
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
 - Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
 - A full live scrape now succeeds through the new CLI and writes to SQLite
-- `pytest` is now part of the local workflow and ready for GitHub Actions
-- An initial GitHub Actions CI workflow now exists for automated test validation
-- The next checkpoint is verifying that workflow from a clean GitHub Actions run
+- `pytest` is now part of the local workflow and enforced in GitHub Actions
+- GitHub Actions CI is active and passing on the repository
+- Ruff linting, formatting checks, and coverage enforcement are part of the CI path
 
 Most recent verified live run:
 
@@ -33,8 +35,8 @@ Most recent verified live run:
 
 Most recent verified test run:
 
-- Command: `./.venv/bin/python -m pytest`
-- Result: `28` tests passed
+- Command: `./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90`
+- Result: `28` tests passed with `94%` coverage across the CI-scoped package modules
 
 ## Architecture
 
@@ -130,6 +132,7 @@ Current quality-oriented implementation choices:
 - the scraper now fails loudly with useful diagnostics instead of silently reporting empty results
 - shared models make the boundaries between layers explicit
 - database behavior is covered with schema, insert, duplicate-prevention, and upsert tests
+- CI now enforces lint, format, and minimum coverage gates on every change
 
 Current local test coverage includes:
 
@@ -143,6 +146,14 @@ Current test command:
 
 ```bash
 ./.venv/bin/python -m pytest
+```
+
+Current CI-quality gate commands:
+
+```bash
+./.venv/bin/python -m ruff check .
+./.venv/bin/python -m ruff format --check .
+./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
 ```
 
 ## CI/CD Roadmap
@@ -159,18 +170,21 @@ The implementation path is deliberately staged:
 
 That progression is useful in interviews because it mirrors real delivery work: stabilize the code first, then automate validation, then automate execution, then harden deployment boundaries.
 
-Planned GitHub Actions scope:
+Current GitHub Actions scope:
 
 - repository checkout
 - Python environment setup
 - dependency installation
-- automated test execution
+- Ruff linting
+- formatting validation
+- automated test execution for the core Python package
+- coverage reporting in the job logs for the deterministic, CI-friendly package modules
 - failure on regression
-- later additions such as linting, coverage reporting, and scheduled scrape runs
+- later additions such as scheduled scrape runs
 
 Current workflow file:
 
-- [ci.yml](/home/vhinson/dev/KTC-Webscraping/.github/workflows/ci.yml): runs `pytest` on push and pull request using Python `3.12`
+- [ci.yml](/home/vhinson/dev/KTC-Webscraping/.github/workflows/ci.yml): runs Ruff and `pytest` with coverage on push and pull request using Python `3.12`
 
 ## Repository Layout
 
@@ -204,9 +218,9 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 
 Immediate next phases:
 
-- Phase 3: GitHub Actions CI
 - Phase 4: stronger persistence design
 - Phase 5: scheduled automation
+- Phase 6: hosted database readiness
 
 ## Resume-Style Talking Points
 

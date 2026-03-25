@@ -12,12 +12,14 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Phase 0 is complete
 - Phase 1 is complete
 - Phase 2 is complete
+- Phase 3 is complete
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
 - `pytest` coverage is in place for transform, load, and CLI behavior
-- Initial GitHub Actions CI workflow has been added
-- Phase 3 is the next implementation focus
-- CI verification in GitHub is the next checkpoint
+- GitHub Actions CI is active and green
+- Ruff and coverage checks are part of the CI workflow
+- Current local CI-equivalent validation passes with 28 tests and 94% coverage
+- Phase 4 is the next implementation focus
 
 ---
 
@@ -140,14 +142,14 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 - [X] Add dependency installation step
 - [X] Add test execution step
 - [X] Fail workflow when tests fail
-- [ ] Verify workflow passes from a clean environment
+- [X] Verify workflow passes from a clean environment
 
 ### Optional CI upgrades
-- [ ] Add Ruff or flake8
-- [ ] Add formatting check if desired
-- [ ] Add coverage reporting
-- [ ] Add minimum coverage threshold
-- [ ] Add badge(s) to README after CI is stable
+- [X] Add Ruff or flake8
+- [X] Add formatting check if desired
+- [X] Add coverage reporting
+- [X] Add minimum coverage threshold
+- [X] Add badge(s) to README after CI is stable
 
 **Definition of done**
 - Every code change is automatically validated

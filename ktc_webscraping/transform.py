@@ -166,7 +166,6 @@ def parse_player_rows_from_text(lines: list[str], scrape_timestamp: str) -> list
         if index + 2 >= len(lines):
             break
 
-        rank = safe_int(rank_text)
         player_line = lines[index + 1]
         position_text = lines[index + 2]
         player_name, team = split_name_and_team(player_line)

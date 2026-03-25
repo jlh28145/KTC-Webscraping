@@ -1,5 +1,5 @@
-import streamlit as st
 import requests
+import streamlit as st
 
 BASE_URL = "http://localhost:8000"
 
@@ -27,8 +27,23 @@ st.markdown("---")
 st.sidebar.header("🔍 Filters")
 position = st.sidebar.selectbox("Position", ["", "QB", "RB", "WR", "TE"])
 team = st.sidebar.text_input("Team")
-tier = st.sidebar.number_input("Tier", min_value=0, max_value=15, step=1, format="%d", key="tier", help="Optional filter for tier.")
-page = st.sidebar.number_input("Page", min_value=1, value=1, step=1, key="page", help="Optional filter for pagination.")
+tier = st.sidebar.number_input(
+    "Tier",
+    min_value=0,
+    max_value=15,
+    step=1,
+    format="%d",
+    key="tier",
+    help="Optional filter for tier.",
+)
+page = st.sidebar.number_input(
+    "Page",
+    min_value=1,
+    value=1,
+    step=1,
+    key="page",
+    help="Optional filter for pagination.",
+)
 limit = st.sidebar.slider("Results per Page", min_value=10, max_value=50, value=25)
 
 # Build parameters for API call

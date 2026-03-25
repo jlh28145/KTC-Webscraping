@@ -36,16 +36,22 @@ def test_create_connection_creates_expected_players_schema(temp_db_path) -> None
     ]
 
 
-def test_create_connection_creates_unique_index_for_player_and_scrape_timestamp(temp_db_path) -> None:
+def test_create_connection_creates_unique_index_for_player_and_scrape_timestamp(
+    temp_db_path,
+) -> None:
     conn = create_connection(temp_db_path)
 
     indexes = conn.execute("PRAGMA index_list(players)").fetchall()
     conn.close()
 
-    assert any(index[1] == "idx_players_player_name_scraped_at" and index[2] == 1 for index in indexes)
+    assert any(
+        index[1] == "idx_players_player_name_scraped_at" and index[2] == 1 for index in indexes
+    )
 
 
-def test_insert_player_data_persists_player_records(temp_db_path, sample_player: PlayerRecord) -> None:
+def test_insert_player_data_persists_player_records(
+    temp_db_path, sample_player: PlayerRecord
+) -> None:
     conn = create_connection(temp_db_path)
 
     insert_player_data(conn, [sample_player])
@@ -80,7 +86,9 @@ def test_insert_player_data_accepts_empty_input(temp_db_path) -> None:
     assert count == 0
 
 
-def test_load_layer_persists_multiple_rows_and_scrape_dates(temp_db_path, scrape_timestamp: str) -> None:
+def test_load_layer_persists_multiple_rows_and_scrape_dates(
+    temp_db_path, scrape_timestamp: str
+) -> None:
     conn = create_connection(temp_db_path)
     players = [
         PlayerRecord(1, "Josh Allen", "QB", 1, "BUF", 29.8, 1, 9989.0, scrape_timestamp),
@@ -102,7 +110,9 @@ def test_load_layer_preserves_float_fields(temp_db_path, scrape_timestamp: str) 
     player = PlayerRecord(3, "Test Player", "WR", 8, "SEA", 24.3, 2, 7777.5, scrape_timestamp)
 
     insert_player_data(conn, [player])
-    age, value = conn.execute("SELECT age, value FROM players WHERE player_name = ?", ("Test Player",)).fetchone()
+    age, value = conn.execute(
+        "SELECT age, value FROM players WHERE player_name = ?", ("Test Player",)
+    ).fetchone()
     conn.close()
 
     assert isinstance(age, float)
@@ -111,7 +121,9 @@ def test_load_layer_preserves_float_fields(temp_db_path, scrape_timestamp: str) 
     assert value == 7777.5
 
 
-def test_load_layer_prevents_duplicate_player_and_scrape_timestamp(temp_db_path, sample_player: PlayerRecord) -> None:
+def test_load_layer_prevents_duplicate_player_and_scrape_timestamp(
+    temp_db_path, sample_player: PlayerRecord
+) -> None:
     conn = create_connection(temp_db_path)
 
     insert_player_data(conn, [sample_player, sample_player])
@@ -121,7 +133,9 @@ def test_load_layer_prevents_duplicate_player_and_scrape_timestamp(temp_db_path,
     assert count == 1
 
 
-def test_load_layer_upserts_existing_player_for_same_scrape_timestamp(temp_db_path, scrape_timestamp: str) -> None:
+def test_load_layer_upserts_existing_player_for_same_scrape_timestamp(
+    temp_db_path, scrape_timestamp: str
+) -> None:
     conn = create_connection(temp_db_path)
     original = PlayerRecord(1, "Josh Allen", "QB", 1, "BUF", 29.8, 1, 9989.0, scrape_timestamp)
     updated = PlayerRecord(2, "Josh Allen", "QB", 1, "BUF", 29.9, 1, 9995.0, scrape_timestamp)

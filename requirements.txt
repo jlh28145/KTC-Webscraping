@@ -2,7 +2,9 @@ beautifulsoup4
 fastapi
 pandas
 pytest
+pytest-cov
 requests
+ruff
 selenium
 streamlit
 uvicorn

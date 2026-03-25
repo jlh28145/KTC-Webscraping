@@ -1,15 +1,18 @@
-from fastapi import FastAPI, Query
 import sqlite3
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
+from fastapi import FastAPI, Query
 
 app = FastAPI()
 DB_PATH = Path(__file__).resolve().parents[1] / "db" / "ktc.db"
+
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # This allows dict-like row access
     return conn
+
 
 @app.get("/rankings", response_model=List[Dict])
 def read_rankings(
@@ -17,7 +20,7 @@ def read_rankings(
     team: Optional[str] = Query(None),
     tier: Optional[int] = Query(None),
     page: int = Query(1, ge=1),
-    limit: int = Query(25, ge=1, le=100)
+    limit: int = Query(25, ge=1, le=100),
 ):
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -53,6 +56,7 @@ def read_rankings(
 
     return [dict(row) for row in rows]
 
+
 # Get player by ID
 @app.get("/rankings/{player_id}", response_model=Dict)
 def get_player_by_id(player_id: int):
@@ -65,6 +69,7 @@ def get_player_by_id(player_id: int):
     if row:
         return dict(row)
     return {"error": "Player not found"}
+
 
 # Get player by Name (case-insensitive)
 @app.get("/player", response_model=List[Dict])

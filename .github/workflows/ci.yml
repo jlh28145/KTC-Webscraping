@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
       - name: Check out repository
@@ -28,5 +30,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run Ruff lint checks
+        run: ruff check .
+
+      - name: Run Ruff format check
+        run: ruff format --check .
+
       - name: Run pytest
-        run: python -m pytest
+        run: python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
