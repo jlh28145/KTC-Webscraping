@@ -1,0 +1,106 @@
+name: Scheduled Scrape
+
+on:
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      page_count:
+        description: Number of ranking pages to scrape
+        required: false
+        default: "10"
+
+concurrency:
+  group: scheduled-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts
+
+      - name: Run scheduled scrape
+        env:
+          PAGE_COUNT: ${{ github.event.inputs.page_count || '10' }}
+          KTC_DB_PATH: artifacts/ktc.db
+        run: |
+          echo "Starting scheduled scrape with PAGE_COUNT=${PAGE_COUNT}"
+          python -m ktc_webscraping.cli --page-count "${PAGE_COUNT}" --db-path "${KTC_DB_PATH}"
+
+      - name: Build scrape summary
+        env:
+          KTC_DB_PATH: artifacts/ktc.db
+        run: |
+          python - <<'PY'
+          import sqlite3
+          from pathlib import Path
+
+          db_path = Path("artifacts/ktc.db")
+          conn = sqlite3.connect(db_path)
+          total_rows = conn.execute("SELECT COUNT(*) FROM ktc_rankings").fetchone()[0]
+          latest_scrape_date = conn.execute(
+              "SELECT MAX(scrape_date) FROM ktc_rankings"
+          ).fetchone()[0]
+          latest_scrape_rows = conn.execute(
+              "SELECT COUNT(*) FROM ktc_rankings WHERE scrape_date = ?",
+              (latest_scrape_date,),
+          ).fetchone()[0]
+          top_rows = conn.execute(
+              """
+              SELECT player_name, rank_overall, position, team
+              FROM ktc_rankings
+              WHERE scrape_date = ?
+              ORDER BY rank_overall ASC
+              LIMIT 10
+              """,
+              (latest_scrape_date,),
+          ).fetchall()
+          conn.close()
+
+          lines = [
+              f"Database path: {db_path}",
+              f"Total rows in artifact DB: {total_rows}",
+              f"Latest scrape date: {latest_scrape_date}",
+              f"Rows for latest scrape date: {latest_scrape_rows}",
+              "",
+              "Top 10 rows from latest scrape:",
+          ]
+          for player_name, rank_overall, position, team in top_rows:
+              lines.append(
+                  f"{rank_overall}. {player_name} ({position}) team={team}"
+              )
+
+          summary_text = "\n".join(lines)
+          Path("artifacts/scrape_summary.txt").write_text(summary_text, encoding="ascii")
+          print(summary_text)
+          PY
+
+      - name: Upload scrape artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: scheduled-scrape-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 14

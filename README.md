@@ -28,6 +28,7 @@ Current implementation status as of March 25, 2026:
 - `pytest` is now part of the local workflow and enforced in GitHub Actions
 - GitHub Actions CI is active and passing on the repository
 - Ruff linting, formatting checks, and coverage enforcement are part of the CI path
+- A scheduled scrape workflow now exists for cron-based and manual automation runs
 
 Most recent verified live run:
 
@@ -190,6 +191,18 @@ Current GitHub Actions scope:
 Current workflow file:
 
 - [ci.yml](/home/vhinson/dev/KTC-Webscraping/.github/workflows/ci.yml): runs Ruff and `pytest` with coverage on push and pull request using Python `3.12`
+- [scrape.yml](/home/vhinson/dev/KTC-Webscraping/.github/workflows/scrape.yml): runs the scraper on a schedule or manual dispatch and uploads the SQLite DB plus a scrape summary as artifacts
+
+## Scheduling And Automation
+
+Scheduled automation now uses GitHub Actions:
+
+- cron schedule: daily at `13:00 UTC`
+- manual trigger: `workflow_dispatch`
+- runtime entrypoint: `python -m ktc_webscraping.cli`
+- artifact outputs: `artifacts/ktc.db` and `artifacts/scrape_summary.txt`
+
+For this phase, the automation path uses database-backed persistence inside the workflow run and publishes the SQLite database as an artifact for inspection. That keeps the execution path aligned with the application architecture while avoiding Git commit-back of binary runtime state.
 
 ## Repository Layout
 
@@ -231,9 +244,9 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 
 Immediate next phases:
 
-- Phase 5: scheduled automation
 - Phase 6: hosted database readiness
 - Phase 7: CLI and developer experience polish
+- Phase 8: README positioning refinements
 
 ## Resume-Style Talking Points
 
