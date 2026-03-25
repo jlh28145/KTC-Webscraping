@@ -21,7 +21,8 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Ruff and coverage checks are part of the CI workflow
 - Current local CI-equivalent validation passes with 28 tests and 94% coverage
 - Historical SQLite persistence is now modeled through `ktc_rankings`
-- Phase 5 is the next implementation focus
+- Scheduled automation workflow has been added
+- Phase 5 verification in GitHub is the next implementation checkpoint
 
 ---
 
@@ -187,16 +188,16 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 
 ## Phase 5 - Add Scheduled Automation
 
-- [ ] Create `.github/workflows/scrape.yml`
-- [ ] Add cron schedule for automatic runs
-- [ ] Add manual `workflow_dispatch` trigger
-- [ ] Make scheduled job run the CLI entrypoint
-- [ ] Ensure scheduled job installs dependencies correctly
-- [ ] Decide persistence path for automation:
+- [X] Create `.github/workflows/scrape.yml`
+- [X] Add cron schedule for automatic runs
+- [X] Add manual `workflow_dispatch` trigger
+- [X] Make scheduled job run the CLI entrypoint
+- [X] Ensure scheduled job installs dependencies correctly
+- [X] Decide persistence path for automation:
   - [ ] CSV commit-back approach
-  - [ ] or database-backed persistence
+- [X] or database-backed persistence
 - [ ] Handle secrets securely if external services are used
-- [ ] Add basic logging / output visibility for scheduled runs
+- [X] Add basic logging / output visibility for scheduled runs
 - [ ] Verify workflow can run without manual intervention
 
 **Definition of done**
