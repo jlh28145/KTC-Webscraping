@@ -29,4 +29,5 @@ class ScrapeConfig:
     base_url: str
     page_count: int
     min_rows_per_page: int
+    retry_attempts: int
     db_path: Path

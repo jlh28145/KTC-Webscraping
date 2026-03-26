@@ -51,6 +51,18 @@ def player_to_row(player: PlayerRecord) -> tuple:
     )
 
 
+def validate_player_records(players: list[PlayerRecord]) -> None:
+    for index, player in enumerate(players):
+        if not player.scrape_date:
+            raise ValueError(f"Player record at index {index} is missing scrape_date")
+        if not player.player_name.strip():
+            raise ValueError(f"Player record at index {index} is missing player_name")
+        if not player.position.strip():
+            raise ValueError(f"Player record at index {index} is missing position")
+        if not player.source.strip():
+            raise ValueError(f"Player record at index {index} is missing source")
+
+
 def create_connection(db_file: Path | str, database_url: str | None = None) -> sqlite3.Connection:
     database_config = build_database_config(db_path=db_file, database_url=database_url)
     if database_config.scheme != "sqlite" or database_config.sqlite_path is None:
@@ -95,6 +107,7 @@ def create_connection(db_file: Path | str, database_url: str | None = None) -> s
 
 
 def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) -> None:
+    validate_player_records(players)
     cursor = conn.cursor()
     cursor.executemany(
         """

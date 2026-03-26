@@ -255,18 +255,18 @@ Status: deferred until we decide to resume cloud services and external database 
 - [X] Add ETL flow explanation
 - [X] Add testing strategy section
 - [X] Add CI/CD section
-- [ ] Add scheduling / automation section
+- [X] Add scheduling / automation section
 - [X] Add database persistence section
 - [X] Add setup instructions
 - [X] Add local run instructions
-- [ ] Add test run instructions
-- [ ] Add workflow overview
+- [X] Add test run instructions
+- [X] Add workflow overview
 - [X] Add future enhancements section
 
 ### README positioning
 - [X] Frame the project as an automation engineering artifact
 - [X] Emphasize deterministic validation
-- [ ] Emphasize CI/CD enforcement
+- [X] Emphasize CI/CD enforcement
 - [X] Emphasize maintainability and modularity
 - [X] Use language that maps to remote QA / SDET roles
 - [X] Avoid overselling Selenium as the headline achievement
@@ -344,16 +344,16 @@ Status: deferred until we decide to resume cloud services and external database 
 
 ## Stretch Goals
 
-- [ ] Add coverage badge
-- [ ] Add lint badge
-- [ ] Add sample dataset artifact
-- [ ] Add Makefile or simple task runner
-- [ ] Add `.env.example`
-- [ ] Add lightweight configuration module
-- [ ] Add logging configuration
-- [ ] Add retry handling around scraping if needed
-- [ ] Add data quality checks before load
-- [ ] Add simple analytics query examples against the database
+- [X] Add coverage badge
+- [X] Add lint badge
+- [X] Add sample dataset artifact
+- [X] Add Makefile or simple task runner
+- [X] Add `.env.example`
+- [X] Add lightweight configuration module
+- [X] Add logging configuration
+- [X] Add retry handling around scraping if needed
+- [X] Add data quality checks before load
+- [X] Add simple analytics query examples against the database
 
 ---
 
