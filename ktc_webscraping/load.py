@@ -1,7 +1,38 @@
 import sqlite3
 from pathlib import Path
 
-from .models import PlayerRecord
+from .models import DatabaseConfig, PlayerRecord
+
+
+def build_database_config(
+    db_path: Path | str | None = None,
+    database_url: str | None = None,
+) -> DatabaseConfig:
+    resolved_database_url = database_url or ""
+    if resolved_database_url:
+        if resolved_database_url.startswith("sqlite:///"):
+            sqlite_path = Path(resolved_database_url.removeprefix("sqlite:///"))
+            return DatabaseConfig(
+                url=resolved_database_url,
+                scheme="sqlite",
+                sqlite_path=sqlite_path,
+            )
+        if resolved_database_url.startswith("postgresql://") or resolved_database_url.startswith(
+            "postgres://"
+        ):
+            return DatabaseConfig(
+                url=resolved_database_url,
+                scheme="postgresql",
+                sqlite_path=None,
+            )
+        raise ValueError(f"Unsupported database URL scheme: {resolved_database_url}")
+
+    resolved_db_path = Path(db_path or "db/ktc.db")
+    return DatabaseConfig(
+        url=f"sqlite:///{resolved_db_path}",
+        scheme="sqlite",
+        sqlite_path=resolved_db_path,
+    )
 
 
 def player_to_row(player: PlayerRecord) -> tuple:
@@ -20,8 +51,15 @@ def player_to_row(player: PlayerRecord) -> tuple:
     )
 
 
-def create_connection(db_file: Path | str) -> sqlite3.Connection:
-    db_path = Path(db_file)
+def create_connection(db_file: Path | str, database_url: str | None = None) -> sqlite3.Connection:
+    database_config = build_database_config(db_path=db_file, database_url=database_url)
+    if database_config.scheme != "sqlite" or database_config.sqlite_path is None:
+        raise NotImplementedError(
+            "Postgres connectivity is not implemented yet. "
+            "Use SQLite locally or add a Postgres client in Phase 6."
+        )
+
+    db_path = database_config.sqlite_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(db_path)

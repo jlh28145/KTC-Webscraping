@@ -3,6 +3,13 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
+class DatabaseConfig:
+    url: str
+    scheme: str
+    sqlite_path: Path | None
+
+
+@dataclass(frozen=True)
 class PlayerRecord:
     scrape_date: str
     player_name: str

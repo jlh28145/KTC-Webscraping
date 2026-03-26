@@ -20,10 +20,13 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - `pytest` coverage is in place for transform, load, and CLI behavior
 - GitHub Actions CI is active and green
 - Ruff and coverage checks are part of the CI workflow
-- Current local CI-equivalent validation passes with 28 tests and 94% coverage
+- Current local CI-equivalent validation passes with 42 tests and 94% coverage
 - Historical SQLite persistence is now modeled through `ktc_rankings`
 - Scheduled automation workflow is active and verified on `main`
-- Phase 6 is the next implementation focus
+- Phase 6 is on hold while cloud services and external connections are deferred
+- Phase 7 is complete with a polished CLI, shared config, `.env.example`, and `Makefile` workflow
+- Hosted Postgres database work is intentionally paused pending a later phase revisit
+- Database URL configuration paths still support local SQLite now and future hosted Postgres later
 
 ---
 
@@ -207,17 +210,19 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 
 ---
 
-## Phase 6 - Prepare for Hosted Database Upgrade
+## Phase 6 - Prepare for Hosted Database Upgrade (Deferred)
 
-- [ ] Evaluate Neon vs Supabase for hosted Postgres
-- [ ] Choose one provider
-- [ ] Create hosted Postgres database
-- [ ] Add environment variable support for connection settings
+Status: deferred until we decide to resume cloud services and external database connections.
+
+- [X] Evaluate Neon vs Supabase for hosted Postgres
+- [X] Choose one provider
+- [X] Create hosted Postgres database
+- [X] Add environment variable support for connection settings
 - [ ] Store secrets in GitHub Secrets
-- [ ] Adapt `load.py` for Postgres compatibility
+- [X] Adapt `load.py` for Postgres compatibility
 - [ ] Validate inserts / upserts against hosted DB
-- [ ] Keep SQLite as the local dev option if practical
-- [ ] Document local vs cloud configuration paths
+- [X] Keep SQLite as the local dev option if practical
+- [X] Document local vs cloud configuration paths
 
 **Definition of done**
 - Repo demonstrates cloud-ready persistence design
@@ -227,14 +232,14 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 
 ## Phase 7 - Create a Professional CLI and Dev Experience
 
-- [ ] Make `cli.py` support clear commands or flags
-- [ ] Add at least one standard run command to README
-- [ ] Support local run flow end-to-end
-- [ ] Support optional output destination selection
-- [ ] Add helpful error messages
-- [ ] Ensure exceptions do not fail silently
-- [ ] Keep logs readable and useful
-- [ ] Make project setup straightforward for another engineer
+- [X] Make `cli.py` support clear commands or flags
+- [X] Add at least one standard run command to README
+- [X] Support local run flow end-to-end
+- [X] Support optional output destination selection
+- [X] Add helpful error messages
+- [X] Ensure exceptions do not fail silently
+- [X] Keep logs readable and useful
+- [X] Make project setup straightforward for another engineer
 
 **Definition of done**
 - Someone can clone the repo and understand how to run it
