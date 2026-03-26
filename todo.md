@@ -14,6 +14,7 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Phase 2 is complete
 - Phase 3 is complete
 - Phase 4 is complete
+- Phase 5 is complete
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
 - `pytest` coverage is in place for transform, load, and CLI behavior
@@ -21,8 +22,8 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Ruff and coverage checks are part of the CI workflow
 - Current local CI-equivalent validation passes with 28 tests and 94% coverage
 - Historical SQLite persistence is now modeled through `ktc_rankings`
-- Scheduled automation workflow has been added
-- Phase 5 verification in GitHub is the next implementation checkpoint
+- Scheduled automation workflow is active and verified on `main`
+- Phase 6 is the next implementation focus
 
 ---
 
@@ -198,7 +199,7 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 - [X] or database-backed persistence
 - [ ] Handle secrets securely if external services are used
 - [X] Add basic logging / output visibility for scheduled runs
-- [ ] Verify workflow can run without manual intervention
+- [X] Verify workflow can run without manual intervention
 
 **Definition of done**
 - Pipeline runs on a schedule

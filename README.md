@@ -23,12 +23,13 @@ Current implementation status as of March 25, 2026:
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
 - Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
+- Phase 5 is complete: scheduled automation is active through GitHub Actions
 - Phase 4 is complete: SQLite persistence now uses a historical `ktc_rankings` schema
 - A full live scrape now succeeds through the new CLI and writes to SQLite
 - `pytest` is now part of the local workflow and enforced in GitHub Actions
 - GitHub Actions CI is active and passing on the repository
 - Ruff linting, formatting checks, and coverage enforcement are part of the CI path
-- A scheduled scrape workflow now exists for cron-based and manual automation runs
+- A scheduled scrape workflow is active for cron-based and manual automation runs
 
 Most recent verified live run:
 
@@ -201,6 +202,8 @@ Scheduled automation now uses GitHub Actions:
 - manual trigger: `workflow_dispatch`
 - runtime entrypoint: `python -m ktc_webscraping.cli`
 - artifact outputs: `artifacts/ktc.db` and `artifacts/scrape_summary.txt`
+
+The workflow has been manually verified on `main`, and scheduled runs are now configured to execute from the default branch.
 
 For this phase, the automation path uses database-backed persistence inside the workflow run and publishes the SQLite database as an artifact for inspection. That keeps the execution path aligned with the application architecture while avoiding Git commit-back of binary runtime state.
 
