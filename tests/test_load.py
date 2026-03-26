@@ -1,7 +1,41 @@
 import sqlite3
+from pathlib import Path
 
-from ktc_webscraping.load import create_connection, insert_player_data
+import pytest
+
+from ktc_webscraping.load import build_database_config, create_connection, insert_player_data
 from ktc_webscraping.models import PlayerRecord
+
+
+def test_build_database_config_defaults_to_sqlite_path(temp_db_path) -> None:
+    config = build_database_config(db_path=temp_db_path)
+
+    assert config.scheme == "sqlite"
+    assert config.sqlite_path == temp_db_path
+    assert config.url == f"sqlite:///{temp_db_path}"
+
+
+def test_build_database_config_accepts_sqlite_database_url(tmp_path: Path) -> None:
+    db_path = tmp_path / "configured.db"
+
+    config = build_database_config(database_url=f"sqlite:///{db_path}")
+
+    assert config.scheme == "sqlite"
+    assert config.sqlite_path == db_path
+
+
+def test_build_database_config_accepts_postgres_database_url() -> None:
+    config = build_database_config(
+        database_url="postgresql://user:password@localhost:5432/ktc_rankings"
+    )
+
+    assert config.scheme == "postgresql"
+    assert config.sqlite_path is None
+
+
+def test_build_database_config_rejects_unknown_scheme() -> None:
+    with pytest.raises(ValueError):
+        build_database_config(database_url="mysql://localhost/example")
 
 
 def test_create_connection_creates_database_and_rankings_table(temp_db_path) -> None:
@@ -14,6 +48,14 @@ def test_create_connection_creates_database_and_rankings_table(temp_db_path) -> 
 
     assert temp_db_path.exists()
     assert table_name == ("ktc_rankings",)
+
+
+def test_create_connection_raises_for_postgres_until_client_is_added(temp_db_path) -> None:
+    with pytest.raises(NotImplementedError):
+        create_connection(
+            temp_db_path,
+            database_url="postgresql://user:password@localhost:5432/ktc_rankings",
+        )
 
 
 def test_create_connection_creates_expected_rankings_schema(temp_db_path) -> None:

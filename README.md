@@ -18,7 +18,7 @@ This repo is meant to demonstrate:
 
 ## Current Status
 
-Current implementation status as of March 25, 2026:
+Current implementation status as of March 26, 2026:
 
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
@@ -30,6 +30,8 @@ Current implementation status as of March 25, 2026:
 - GitHub Actions CI is active and passing on the repository
 - Ruff linting, formatting checks, and coverage enforcement are part of the CI path
 - A scheduled scrape workflow is active for cron-based and manual automation runs
+- Database configuration now supports local SQLite by default and environment-driven hosted DB readiness
+- Phase 7 is complete: the CLI now supports a first-class `scrape` command, shared config, `.env.example`, and `Makefile` shortcuts
 
 Most recent verified live run:
 
@@ -39,7 +41,7 @@ Most recent verified live run:
 Most recent verified test run:
 
 - Command: `./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90`
-- Result: local validation command remains aligned with CI, and Phase 4 tests pass locally
+- Result: 42 tests passing with 94.32% total coverage, aligned with the CI quality gate
 
 ## Architecture
 
@@ -77,6 +79,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Optional local environment file:
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a
+```
+
+Simple task runner shortcuts:
+
+```bash
+make lint
+make test
+make scrape PAGE_COUNT=10
+```
+
 Python target:
 
 - `3.12` via [`.python-version`](/home/vhinson/dev/KTC-Webscraping/.python-version)
@@ -89,10 +106,16 @@ Preferred package entrypoint:
 ./.venv/bin/python -m ktc_webscraping.cli --page-count 10
 ```
 
+Explicit `scrape` subcommand:
+
+```bash
+./.venv/bin/python -m ktc_webscraping.cli scrape --page-count 10
+```
+
 Run with a visible browser:
 
 ```bash
-./.venv/bin/python -m ktc_webscraping.cli --page-count 10 --headed
+./.venv/bin/python -m ktc_webscraping.cli scrape --page-count 10 --headed
 ```
 
 Backwards-compatible legacy entrypoint:
@@ -126,6 +149,33 @@ The current record shape includes:
 The SQLite persistence layer now stores historical ranking snapshots in `ktc_rankings`.
 The uniqueness rule is based on `scrape_date`, `player_name`, and `source`, which allows historical rows to accumulate across days while preventing duplicates within the same scrape-date snapshot.
 
+## Database Configuration
+
+The project now supports environment-based database configuration paths:
+
+- local default: `KTC_DB_PATH=db/ktc.db`
+- explicit SQLite URL: `KTC_DATABASE_URL=sqlite:///db/ktc.db`
+- future hosted Postgres path: `KTC_DATABASE_URL=postgresql://...`
+
+Current Phase 6 behavior:
+
+- SQLite is still the active local development and automation backend
+- the load layer now recognizes Postgres-style URLs as part of the config model
+- actual Postgres connectivity is intentionally deferred until hosted database provisioning is complete
+
+## Hosted Database Direction
+
+The recommended Phase 6 provider for this project is **Neon**.
+
+Why Neon is the better fit here:
+
+- it is designed specifically around serverless Postgres, which fits this repo's scheduled GitHub Actions runtime well
+- branching is a first-class feature, which makes it easier to discuss safer schema changes and environment separation
+- it keeps the hosted database story focused on Postgres itself rather than a broader application platform
+- it maps cleanly to the existing `KTC_DATABASE_URL` configuration path already in this repo
+
+Supabase is also a solid option, but Neon is the more direct fit for a project whose next step is hosted Postgres rather than a broader backend platform.
+
 ## Quality Strategy
 
 This repo is being shaped around deterministic validation instead of fragile browser-only testing.
@@ -154,6 +204,16 @@ Current test command:
 ```bash
 ./.venv/bin/python -m pytest
 ```
+
+Relevant local configuration examples:
+
+```bash
+./.venv/bin/python -m ktc_webscraping.cli --db-path db/ktc.db
+./.venv/bin/python -m ktc_webscraping.cli scrape --db-path db/ktc.db
+KTC_DATABASE_URL=sqlite:///db/ktc.db ./.venv/bin/python -m ktc_webscraping.cli
+```
+
+The shared runtime defaults live in [ktc_webscraping/config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/config.py), which keeps environment-based setup logic separate from the CLI behavior.
 
 Current CI-quality gate commands:
 
@@ -207,6 +267,8 @@ The workflow has been manually verified on `main`, and scheduled runs are now co
 
 For this phase, the automation path uses database-backed persistence inside the workflow run and publishes the SQLite database as an artifact for inspection. That keeps the execution path aligned with the application architecture while avoiding Git commit-back of binary runtime state.
 
+When hosted persistence is introduced, the workflow is already prepared to read `KTC_DATABASE_URL` from GitHub Secrets. If that secret is absent, the workflow continues using the artifact-backed SQLite path.
+
 ## Repository Layout
 
 ```text
@@ -247,8 +309,8 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 
 Immediate next phases:
 
-- Phase 6: hosted database readiness
-- Phase 7: CLI and developer experience polish
+- Phase 6: hosted database readiness is deferred
+- Phase 7: professional CLI and developer experience is now in place
 - Phase 8: README positioning refinements
 
 ## Resume-Style Talking Points

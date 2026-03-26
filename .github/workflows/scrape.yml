@@ -44,6 +44,7 @@ jobs:
       - name: Run scheduled scrape
         env:
           PAGE_COUNT: ${{ github.event.inputs.page_count || '10' }}
+          KTC_DATABASE_URL: ${{ secrets.KTC_DATABASE_URL }}
           KTC_DB_PATH: artifacts/ktc.db
         run: |
           echo "Starting scheduled scrape with PAGE_COUNT=${PAGE_COUNT}"
