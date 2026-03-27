@@ -8,6 +8,8 @@ def build_database_config(
     db_path: Path | str | None = None,
     database_url: str | None = None,
 ) -> DatabaseConfig:
+    """Resolve database settings from either an explicit URL or local SQLite path."""
+
     resolved_database_url = database_url or ""
     if resolved_database_url:
         if resolved_database_url.startswith("sqlite:///"):
@@ -36,6 +38,8 @@ def build_database_config(
 
 
 def player_to_row(player: PlayerRecord) -> tuple:
+    """Convert a player record into the row shape expected by SQLite inserts."""
+
     return (
         player.scrape_date,
         player.player_name,
@@ -64,6 +68,8 @@ def validate_player_records(players: list[PlayerRecord]) -> None:
 
 
 def create_connection(db_file: Path | str, database_url: str | None = None) -> sqlite3.Connection:
+    """Create the local SQLite connection and ensure the supported schema exists."""
+
     database_config = build_database_config(db_path=db_file, database_url=database_url)
     if database_config.scheme != "sqlite" or database_config.sqlite_path is None:
         raise NotImplementedError(

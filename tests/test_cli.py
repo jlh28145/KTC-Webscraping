@@ -1,4 +1,5 @@
 import os
+import runpy
 from pathlib import Path
 
 import pytest
@@ -244,3 +245,21 @@ def test_main_exits_with_configuration_error_for_bad_database_url(
 def test_modules_import_without_triggering_a_scrape() -> None:
     assert callable(cli.main)
     assert callable(legacy_scraper.main)
+
+
+def test_main_returns_zero_and_prints_help_for_help_flag(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["--help"])
+
+    captured = capsys.readouterr()
+    assert exc_info.value.code == 0
+    assert "usage:" in captured.out
+
+
+def test_cli_module_main_block_raises_system_exit(monkeypatch) -> None:
+    monkeypatch.setattr("sys.argv", ["ktc_webscraping.cli", "--help"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("ktc_webscraping.cli", run_name="__main__")
+
+    assert exc_info.value.code == 0

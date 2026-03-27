@@ -22,13 +22,15 @@ This repo is meant to demonstrate:
 
 ## Current Status
 
-Current implementation status as of March 26, 2026:
+Current implementation status as of March 27, 2026:
 
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
-- Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
+- Phase 2 is complete: deterministic tests now cover transform, extract, load, logging, and CLI behavior
 - Phase 5 is complete: scheduled automation is active through GitHub Actions
 - Phase 4 is complete: SQLite persistence now uses a historical `ktc_rankings` schema
+- Phase 8 is complete: README positioning now emphasizes automation engineering, deterministic validation, and CI/CD enforcement
+- Phase 9 is complete: code quality polish now includes clearer models, docstrings, logging, retries, and stricter load validation
 - A full live scrape now succeeds through the new CLI and writes to SQLite
 - `pytest` is now part of the local workflow and enforced in GitHub Actions
 - GitHub Actions CI is active and passing on the repository
@@ -47,7 +49,20 @@ Most recent verified live run:
 Most recent verified test run:
 
 - Command: `./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90`
-- Result: 42 tests passing with 94.32% total coverage, aligned with the CI quality gate
+- Result: 47 tests passing with 94.16% total coverage, aligned with the CI quality gate
+
+## Workflow Overview
+
+The repo is organized around one repeatable engineering loop:
+
+1. Run the scraper locally through the CLI.
+2. Normalize ranking rows into deterministic `PlayerRecord` objects.
+3. Persist historical snapshots into SQLite.
+4. Validate changes with Ruff and `pytest` before merge.
+5. Let GitHub Actions rerun the same checks on push and pull request.
+6. Let the scheduled workflow execute the scraper automatically and publish artifacts.
+
+That flow matters for the portfolio story because it shows validation, automation, and persistence working together instead of existing as disconnected bullet points.
 
 ## Workflow Overview
 

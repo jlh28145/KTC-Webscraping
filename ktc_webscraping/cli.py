@@ -22,6 +22,8 @@ LOGGER = getLogger(__name__)
 
 
 def positive_int(value: str) -> int:
+    """Argparse validator for positive integer CLI options."""
+
     parsed = int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError("value must be a positive integer")
@@ -29,6 +31,8 @@ def positive_int(value: str) -> int:
 
 
 def build_config(args: argparse.Namespace) -> ScrapeConfig:
+    """Map parsed CLI arguments into a strongly typed scrape config."""
+
     return ScrapeConfig(
         base_url=args.base_url,
         page_count=args.page_count,
@@ -39,6 +43,8 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI parser used by local runs and automation."""
+
     parser = argparse.ArgumentParser(
         description=(
             "Scrape KeepTradeCut rankings into a local SQLite database or a future hosted database."
@@ -56,6 +62,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register arguments shared by the scraper entrypoint."""
+
     parser.add_argument(
         "--page-count",
         type=positive_int,
@@ -98,6 +106,8 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def run(config: ScrapeConfig, headed: bool = False) -> int:
+    """Execute a scrape run and persist the normalized results."""
+
     database_url = os.getenv("KTC_DATABASE_URL")
     database_config = build_database_config(db_path=config.db_path, database_url=database_url)
     LOGGER.info("Starting scrape run with database %s", database_config.url)

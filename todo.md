@@ -15,16 +15,20 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 - Phase 3 is complete
 - Phase 4 is complete
 - Phase 5 is complete
+- Phase 8 is complete
+- Phase 9 is complete
 - Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
 - Most recent verified full run inserted `500` records into `db/ktc.db`
-- `pytest` coverage is in place for transform, load, and CLI behavior
+- `pytest` coverage is in place for transform, extract, load, logging, and CLI behavior
 - GitHub Actions CI is active and green
 - Ruff and coverage checks are part of the CI workflow
-- Current local CI-equivalent validation passes with 42 tests and 94% coverage
+- Current local CI-equivalent validation passes with 47 tests and 94% coverage
 - Historical SQLite persistence is now modeled through `ktc_rankings`
 - Scheduled automation workflow is active and verified on `main`
 - Phase 6 is on hold while cloud services and external connections are deferred
 - Phase 7 is complete with a polished CLI, shared config, `.env.example`, and `Makefile` workflow
+- Phase 8 is complete with README positioning refinements for remote QA / SDET roles
+- Phase 9 is complete with logging, retry handling, stronger validation, and cleanup across the package
 - Hosted Postgres database work is intentionally paused pending a later phase revisit
 - Database URL configuration paths still support local SQLite now and future hosted Postgres later
 
@@ -279,17 +283,17 @@ Status: deferred until we decide to resume cloud services and external database 
 
 ## Phase 9 - Polish Code Quality
 
-- [ ] Standardize naming conventions
-- [ ] Remove dead code
-- [ ] Remove commented-out junk
-- [ ] Add docstrings where useful
-- [ ] Add type hints where practical
-- [ ] Improve function boundaries
-- [ ] Reduce duplicate logic
-- [ ] Improve error handling
-- [ ] Keep imports organized
-- [ ] Keep config separate from logic
-- [ ] Make data models explicit and readable
+- [X] Standardize naming conventions
+- [X] Remove dead code
+- [X] Remove commented-out junk
+- [X] Add docstrings where useful
+- [X] Add type hints where practical
+- [X] Improve function boundaries
+- [X] Reduce duplicate logic
+- [X] Improve error handling
+- [X] Keep imports organized
+- [X] Keep config separate from logic
+- [X] Make data models explicit and readable
 
 **Definition of done**
 - Code is easier to review, explain, and maintain
@@ -331,12 +335,12 @@ Status: deferred until we decide to resume cloud services and external database 
 
 ## Recommended Build Order
 
-- [ ] 1. Activate repo
-- [ ] 2. Refactor architecture
-- [ ] 3. Write transform tests
-- [ ] 4. Add load tests with SQLite
-- [ ] 5. Add CI workflow
-- [ ] 6. Add scheduled automation
+- [X] 1. Activate repo
+- [X] 2. Refactor architecture
+- [X] 3. Write transform tests
+- [X] 4. Add load tests with SQLite
+- [X] 5. Add CI workflow
+- [X] 6. Add scheduled automation
 - [ ] 7. Upgrade to hosted Postgres
 - [ ] 8. Polish README and interview story
 
