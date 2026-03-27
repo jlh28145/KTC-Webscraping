@@ -1,5 +1,7 @@
 import os
+import time
 from datetime import datetime
+from logging import getLogger
 
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -27,6 +29,48 @@ DEFAULT_BASE_URL = (
 )
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
+LOGGER = getLogger(__name__)
+
+
+def extract_page_records_with_retry(
+    driver: webdriver.Chrome,
+    wait: WebDriverWait,
+    page_number: int,
+    base_url: str,
+    min_rows_per_page: int,
+    scrape_timestamp: str,
+    retry_attempts: int,
+) -> list[PlayerRecord]:
+    total_attempts = retry_attempts + 1
+    last_error: RuntimeError | None = None
+
+    for attempt in range(1, total_attempts + 1):
+        try:
+            return extract_page_records(
+                driver=driver,
+                wait=wait,
+                page_number=page_number,
+                base_url=base_url,
+                min_rows_per_page=min_rows_per_page,
+                scrape_timestamp=scrape_timestamp,
+            )
+        except RuntimeError as exc:
+            last_error = exc
+            if attempt == total_attempts:
+                break
+            LOGGER.warning(
+                "Page %s failed on attempt %s/%s: %s",
+                page_number + 1,
+                attempt,
+                total_attempts,
+                exc,
+            )
+            time.sleep(attempt)
+
+    assert last_error is not None
+    raise RuntimeError(
+        f"Page {page_number + 1} failed after {total_attempts} attempts: {last_error}"
+    ) from last_error
 
 
 def detect_block_page(page_source: str) -> str | None:
@@ -175,17 +219,19 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
 
     try:
         for page in range(config.page_count):
-            print(f"Scraping page {page + 1}")
+            LOGGER.info("Scraping page %s of %s", page + 1, config.page_count)
             scrape_timestamp = datetime.now().isoformat()
-            page_rows = extract_page_records(
+            page_rows = extract_page_records_with_retry(
                 driver=driver,
                 wait=wait,
                 page_number=page,
                 base_url=config.base_url,
                 min_rows_per_page=config.min_rows_per_page,
                 scrape_timestamp=scrape_timestamp,
+                retry_attempts=config.retry_attempts,
             )
             all_players.extend(page_rows)
+            LOGGER.info("Parsed %s rows from page %s", len(page_rows), page + 1)
     finally:
         driver.quit()
 

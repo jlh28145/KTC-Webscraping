@@ -18,6 +18,7 @@ def test_build_parser_uses_expected_defaults() -> None:
     assert args.db_path == cli.DEFAULT_DB_PATH
     assert args.base_url == cli.DEFAULT_BASE_URL
     assert args.min_rows_per_page == cli.DEFAULT_MIN_ROWS_PER_PAGE
+    assert args.retry_attempts == 2
     assert args.headed is False
 
 
@@ -34,6 +35,8 @@ def test_build_config_maps_args_into_scrape_config(tmp_path: Path) -> None:
             "https://example.com?page={page}",
             "--min-rows-per-page",
             "25",
+            "--retry-attempts",
+            "4",
             "--headed",
         ]
     )
@@ -44,6 +47,7 @@ def test_build_config_maps_args_into_scrape_config(tmp_path: Path) -> None:
     assert config.db_path == tmp_path / "custom.db"
     assert config.base_url == "https://example.com?page={page}"
     assert config.min_rows_per_page == 25
+    assert config.retry_attempts == 4
 
 
 def test_parser_rejects_non_positive_page_count() -> None:
@@ -58,6 +62,7 @@ def test_run_uses_load_and_extract_layers(monkeypatch, tmp_path: Path, capsys) -
         base_url="https://example.com?page={page}",
         page_count=1,
         min_rows_per_page=1,
+        retry_attempts=2,
         db_path=tmp_path / "run.db",
     )
     players = [

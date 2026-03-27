@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from logging import getLogger
 from pathlib import Path
 
 from .config import load_runtime_config
@@ -11,11 +12,13 @@ from .extract import (
     scrape_rankings,
 )
 from .load import build_database_config, create_connection, insert_player_data
+from .logging_config import configure_logging
 from .models import ScrapeConfig
 
 DEFAULT_RUNTIME_CONFIG = load_runtime_config()
 DEFAULT_DB_PATH = DEFAULT_RUNTIME_CONFIG.db_path
 DEFAULT_DATABASE_URL = DEFAULT_RUNTIME_CONFIG.database_url
+LOGGER = getLogger(__name__)
 
 
 def positive_int(value: str) -> int:
@@ -30,6 +33,7 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         base_url=args.base_url,
         page_count=args.page_count,
         min_rows_per_page=args.min_rows_per_page,
+        retry_attempts=args.retry_attempts,
         db_path=args.db_path,
     )
 
@@ -81,6 +85,12 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
         help="Minimum number of ranking rows expected before parsing a page.",
     )
     parser.add_argument(
+        "--retry-attempts",
+        type=positive_int,
+        default=2,
+        help="Number of retry attempts for a page after the initial failure.",
+    )
+    parser.add_argument(
         "--headed",
         action="store_true",
         help="Run Chrome with a visible browser window instead of headless mode.",
@@ -90,6 +100,7 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
 def run(config: ScrapeConfig, headed: bool = False) -> int:
     database_url = os.getenv("KTC_DATABASE_URL")
     database_config = build_database_config(db_path=config.db_path, database_url=database_url)
+    LOGGER.info("Starting scrape run with database %s", database_config.url)
     conn = create_connection(config.db_path, database_url=database_config.url)
     try:
         players = scrape_rankings(config=config, headless=not headed)
@@ -97,12 +108,14 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
     finally:
         conn.close()
 
+    LOGGER.info("Stored %s records", len(players))
     print(f"Scraped and stored {len(players)} records using {database_config.scheme}.")
     print(f"Destination: {database_config.url}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_logging()
     parser = build_parser()
     raw_argv = argv if argv is not None else sys.argv[1:]
     normalized_argv = raw_argv
@@ -125,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     except NotImplementedError as exc:
         parser.exit(2, f"{exc}\n")
     except Exception as exc:
+        LOGGER.exception("Scrape failed")
         print(f"Scrape failed: {exc}", file=sys.stderr)
         return 1
 
