@@ -1,5 +1,7 @@
 import os
+import time
 from datetime import datetime
+from logging import getLogger
 
 from selenium import webdriver
 from selenium.common.exceptions import (
@@ -27,9 +29,12 @@ DEFAULT_BASE_URL = (
 )
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
+LOGGER = getLogger(__name__)
 
 
 def detect_block_page(page_source: str) -> str | None:
+    """Return a likely anti-bot marker when the page looks blocked."""
+
     lowered = page_source.lower()
     markers = [
         "verify you are human",
@@ -46,6 +51,8 @@ def detect_block_page(page_source: str) -> str | None:
 
 
 def build_driver(headless: bool = True) -> tuple[webdriver.Chrome, WebDriverWait]:
+    """Create a Selenium Chrome driver with sensible defaults for local and CI use."""
+
     chrome_options = Options()
     if headless:
         chrome_options.add_argument("--headless=new")
@@ -67,6 +74,8 @@ def build_driver(headless: bool = True) -> tuple[webdriver.Chrome, WebDriverWait
 
 
 def close_popup(driver: webdriver.Chrome) -> None:
+    """Dismiss the landing modal if it is present."""
+
     try:
         popup_wait = WebDriverWait(driver, 5)
         popup = popup_wait.until(EC.presence_of_element_located((By.CLASS_NAME, "modal-content")))
@@ -80,6 +89,8 @@ def close_popup(driver: webdriver.Chrome) -> None:
 def wait_for_rankings(
     driver: webdriver.Chrome, wait: WebDriverWait, min_rows_per_page: int
 ) -> None:
+    """Block until the rankings container is ready and populated."""
+
     wait.until(
         lambda current_driver: (
             current_driver.execute_script("return document.readyState") == "complete"
@@ -118,6 +129,8 @@ def load_page_html(
     base_url: str,
     min_rows_per_page: int,
 ) -> str:
+    """Load one rankings page and return its HTML once the rows are available."""
+
     driver.get(base_url.format(page=page_number))
     wait_for_rankings(driver, wait, min_rows_per_page)
     return driver.page_source
@@ -131,6 +144,8 @@ def extract_page_records(
     min_rows_per_page: int,
     scrape_timestamp: str,
 ) -> list[PlayerRecord]:
+    """Extract ranking records from one page using DOM and text-layout fallbacks."""
+
     page_html = load_page_html(driver, wait, page_number, base_url, min_rows_per_page)
     records = parse_player_rows(page_html, scrape_timestamp)
     if records:
@@ -169,23 +184,70 @@ def extract_page_records(
     )
 
 
+def extract_page_records_with_retry(
+    driver: webdriver.Chrome,
+    wait: WebDriverWait,
+    page_number: int,
+    base_url: str,
+    min_rows_per_page: int,
+    scrape_timestamp: str,
+    retry_attempts: int,
+) -> list[PlayerRecord]:
+    """Retry page extraction a bounded number of times before failing the run."""
+
+    total_attempts = retry_attempts + 1
+    last_error: RuntimeError | None = None
+
+    for attempt in range(1, total_attempts + 1):
+        try:
+            return extract_page_records(
+                driver=driver,
+                wait=wait,
+                page_number=page_number,
+                base_url=base_url,
+                min_rows_per_page=min_rows_per_page,
+                scrape_timestamp=scrape_timestamp,
+            )
+        except RuntimeError as exc:
+            last_error = exc
+            if attempt == total_attempts:
+                break
+            LOGGER.warning(
+                "Page %s failed on attempt %s/%s: %s",
+                page_number + 1,
+                attempt,
+                total_attempts,
+                exc,
+            )
+            time.sleep(attempt)
+
+    assert last_error is not None
+    raise RuntimeError(
+        f"Page {page_number + 1} failed after {total_attempts} attempts: {last_error}"
+    ) from last_error
+
+
 def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerRecord]:
+    """Scrape all configured pages and return normalized player records."""
+
     driver, wait = build_driver(headless=headless)
     all_players: list[PlayerRecord] = []
 
     try:
         for page in range(config.page_count):
-            print(f"Scraping page {page + 1}")
+            LOGGER.info("Scraping page %s of %s", page + 1, config.page_count)
             scrape_timestamp = datetime.now().isoformat()
-            page_rows = extract_page_records(
+            page_rows = extract_page_records_with_retry(
                 driver=driver,
                 wait=wait,
                 page_number=page,
                 base_url=config.base_url,
                 min_rows_per_page=config.min_rows_per_page,
                 scrape_timestamp=scrape_timestamp,
+                retry_attempts=config.retry_attempts,
             )
             all_players.extend(page_rows)
+            LOGGER.info("Parsed %s rows from page %s", len(page_rows), page + 1)
     finally:
         driver.quit()
 

@@ -16,9 +16,11 @@ from ktc_webscraping.transform import (
 
 def test_safe_number_helpers_handle_invalid_values() -> None:
     assert safe_int("12") == 12
+    assert safe_int(None) is None
     assert safe_int("bad") is None
     assert safe_float("10.5") == 10.5
     assert safe_float(None) is None
+    assert safe_float("bad") is None
 
 
 def test_normalize_position_handles_ranked_players_and_picks() -> None:
@@ -129,6 +131,20 @@ def test_parse_player_text_lines_returns_none_for_missing_tier(scrape_timestamp:
     assert parse_player_text_lines(lines, scrape_timestamp) is None
 
 
+def test_parse_player_text_lines_returns_none_for_non_ranked_lines(scrape_timestamp: str) -> None:
+    lines = ["Bijan Robinson", "ATL", "RB1", "Tier 1", "9999"]
+
+    assert parse_player_text_lines(lines, scrape_timestamp) is None
+
+
+def test_parse_player_text_lines_returns_none_when_position_index_is_out_of_range(
+    scrape_timestamp: str,
+) -> None:
+    lines = ["1", "Bijan Robinson", "ATL"]
+
+    assert parse_player_text_lines(lines, scrape_timestamp) is None
+
+
 def test_parse_player_rows_uses_legacy_html_when_available(
     legacy_row_html: str, scrape_timestamp: str
 ) -> None:
@@ -194,3 +210,113 @@ def test_parse_player_rows_preserves_duplicate_rows(scrape_timestamp: str) -> No
 
     assert len(records) == 2
     assert records[0] == records[1]
+
+
+def test_parse_player_rows_from_text_returns_empty_list_without_header(
+    scrape_timestamp: str,
+) -> None:
+    lines = ["1", "Bijan RobinsonATL", "RB1", "24.1 y.o.", "Tier 1", "1", "9999"]
+
+    assert parse_player_rows_from_text(lines, scrape_timestamp) == []
+
+
+def test_parse_player_rows_from_text_skips_non_digit_lines_before_record(
+    scrape_timestamp: str,
+) -> None:
+    lines = [
+        "RANK",
+        "PLAYER NAME",
+        "POS",
+        "AGE",
+        "TIER",
+        "30DT",
+        "30 DAY TREND",
+        "VALUE",
+        "ADVERTISEMENT",
+        "1",
+        "Bijan RobinsonATL",
+        "RB1",
+        "•",
+        "24.1 y.o.",
+        "Tier 1",
+        "1",
+        "9999",
+    ]
+
+    records = parse_player_rows_from_text(lines, scrape_timestamp)
+
+    assert len(records) == 1
+    assert records[0].player_name == "Bijan Robinson"
+
+
+def test_parse_player_rows_from_text_stops_on_incomplete_record(scrape_timestamp: str) -> None:
+    lines = [
+        "RANK",
+        "PLAYER NAME",
+        "POS",
+        "AGE",
+        "TIER",
+        "30DT",
+        "30 DAY TREND",
+        "VALUE",
+        "1",
+        "Bijan RobinsonATL",
+    ]
+
+    assert parse_player_rows_from_text(lines, scrape_timestamp) == []
+
+
+def test_parse_player_rows_from_text_stops_on_invalid_pick_record(scrape_timestamp: str) -> None:
+    lines = [
+        "RANK",
+        "PLAYER NAME",
+        "POS",
+        "AGE",
+        "TIER",
+        "30DT",
+        "30 DAY TREND",
+        "VALUE",
+        "2",
+        "2027 Early 1stFA",
+        "PICK",
+        "6810",
+        "1",
+        "3",
+        "Josh AllenBUF",
+        "QB1",
+        "29.8 y.o.",
+        "Tier 1",
+        "1",
+        "9989",
+    ]
+
+    assert parse_player_rows_from_text(lines, scrape_timestamp) == []
+
+
+def test_parse_player_rows_from_text_stops_on_invalid_standard_record(
+    scrape_timestamp: str,
+) -> None:
+    lines = [
+        "RANK",
+        "PLAYER NAME",
+        "POS",
+        "AGE",
+        "TIER",
+        "30DT",
+        "30 DAY TREND",
+        "VALUE",
+        "1",
+        "Bijan RobinsonATL",
+        "RB1",
+        "24.1 y.o.",
+        "9999",
+        "2",
+        "Josh AllenBUF",
+        "QB1",
+        "29.8 y.o.",
+        "Tier 1",
+        "1",
+        "9989",
+    ]
+
+    assert parse_player_rows_from_text(lines, scrape_timestamp) == []

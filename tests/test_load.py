@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from ktc_webscraping.load import build_database_config, create_connection, insert_player_data
+from ktc_webscraping.load import (
+    build_database_config,
+    create_connection,
+    insert_player_data,
+    validate_player_records,
+)
 from ktc_webscraping.models import PlayerRecord
 
 
@@ -172,6 +177,93 @@ def test_insert_player_data_accepts_empty_input(temp_db_path) -> None:
     conn.close()
 
     assert count == 0
+
+
+def test_validate_player_records_rejects_blank_player_name(scrape_timestamp: str) -> None:
+    players = [
+        PlayerRecord(
+            "2026-03-21",
+            "   ",
+            "QB",
+            1,
+            1,
+            "BUF",
+            "keeptradecut",
+            29.8,
+            1,
+            9989.0,
+            scrape_timestamp,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="missing player_name"):
+        validate_player_records(players)
+
+
+def test_validate_player_records_rejects_missing_scrape_date(scrape_timestamp: str) -> None:
+    players = [
+        PlayerRecord(
+            "",
+            "Josh Allen",
+            "QB",
+            1,
+            1,
+            "BUF",
+            "keeptradecut",
+            29.8,
+            1,
+            9989.0,
+            scrape_timestamp,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="missing scrape_date"):
+        validate_player_records(players)
+
+
+def test_validate_player_records_rejects_blank_position(scrape_timestamp: str) -> None:
+    players = [
+        PlayerRecord(
+            "2026-03-21",
+            "Josh Allen",
+            " ",
+            1,
+            1,
+            "BUF",
+            "keeptradecut",
+            29.8,
+            1,
+            9989.0,
+            scrape_timestamp,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="missing position"):
+        validate_player_records(players)
+
+
+def test_insert_player_data_rejects_blank_source(temp_db_path, scrape_timestamp: str) -> None:
+    conn = create_connection(temp_db_path)
+    players = [
+        PlayerRecord(
+            "2026-03-21",
+            "Josh Allen",
+            "QB",
+            1,
+            1,
+            "BUF",
+            " ",
+            29.8,
+            1,
+            9989.0,
+            scrape_timestamp,
+        )
+    ]
+
+    with pytest.raises(ValueError, match="missing source"):
+        insert_player_data(conn, players)
+
+    conn.close()
 
 
 def test_load_layer_persists_multiple_rows_and_scrape_dates(

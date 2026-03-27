@@ -1,10 +1,14 @@
 # KTC Webscraping
 
 [![CI](https://github.com/jlh28145/KTC-Webscraping/actions/workflows/ci.yml/badge.svg)](https://github.com/jlh28145/KTC-Webscraping/actions/workflows/ci.yml)
+[![Coverage Gate](https://img.shields.io/badge/coverage-94%25-brightgreen)](/home/vhinson/dev/KTC-Webscraping/README.md)
+[![Ruff](https://img.shields.io/badge/lint-ruff-blue)](/home/vhinson/dev/KTC-Webscraping/pyproject.toml)
 
 `KTC Webscraping` is a portfolio ETL project built around scraping KeepTradeCut dynasty rankings, normalizing the results, and persisting them into SQLite for downstream API and dashboard use.
 
 The project is being developed intentionally as a proof repo for remote QA, SDET, and Quality Engineering roles. The goal is not just to scrape data, but to show engineering habits that translate well to production systems: layered design, deterministic parsing, testability, automation readiness, and a clear path to CI/CD.
+
+In practical terms, this repo is meant to tell a simple story quickly: take a browser-driven scrape, refactor it into a testable ETL package, enforce quality gates in CI, automate recurring execution, and keep the project readable enough that another engineer could extend it without guesswork.
 
 ## Why This Project Exists
 
@@ -18,13 +22,15 @@ This repo is meant to demonstrate:
 
 ## Current Status
 
-Current implementation status as of March 26, 2026:
+Current implementation status as of March 27, 2026:
 
 - Phase 0 is complete: the repo runs locally with a documented setup flow
 - Phase 1 is complete: the scraper has been refactored into a proper Python package
-- Phase 2 is complete: deterministic tests now cover transform, load, and CLI behavior
+- Phase 2 is complete: deterministic tests now cover transform, extract, load, logging, and CLI behavior
 - Phase 5 is complete: scheduled automation is active through GitHub Actions
 - Phase 4 is complete: SQLite persistence now uses a historical `ktc_rankings` schema
+- Phase 8 is complete: README positioning now emphasizes automation engineering, deterministic validation, and CI/CD enforcement
+- Phase 9 is complete: code quality polish now includes clearer models, docstrings, logging, retries, and stricter load validation
 - A full live scrape now succeeds through the new CLI and writes to SQLite
 - `pytest` is now part of the local workflow and enforced in GitHub Actions
 - GitHub Actions CI is active and passing on the repository
@@ -32,6 +38,8 @@ Current implementation status as of March 26, 2026:
 - A scheduled scrape workflow is active for cron-based and manual automation runs
 - Database configuration now supports local SQLite by default and environment-driven hosted DB readiness
 - Phase 7 is complete: the CLI now supports a first-class `scrape` command, shared config, `.env.example`, and `Makefile` shortcuts
+- Stretch goals now include shared logging configuration, sample dataset artifacts, and starter analytics queries
+- Scrape execution now retries transient page failures before aborting the run
 
 Most recent verified live run:
 
@@ -41,7 +49,20 @@ Most recent verified live run:
 Most recent verified test run:
 
 - Command: `./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90`
-- Result: 42 tests passing with 94.32% total coverage, aligned with the CI quality gate
+- Result: 47 tests passing with 94.16% total coverage, aligned with the CI quality gate
+
+## Workflow Overview
+
+The repo is organized around one repeatable engineering loop:
+
+1. Run the scraper locally through the CLI.
+2. Normalize ranking rows into deterministic `PlayerRecord` objects.
+3. Persist historical snapshots into SQLite.
+4. Validate changes with Ruff and `pytest` before merge.
+5. Let GitHub Actions rerun the same checks on push and pull request.
+6. Let the scheduled workflow execute the scraper automatically and publish artifacts.
+
+That flow matters for the portfolio story because it shows validation, automation, and persistence working together instead of existing as disconnected bullet points.
 
 ## Architecture
 
@@ -112,6 +133,12 @@ Explicit `scrape` subcommand:
 ./.venv/bin/python -m ktc_webscraping.cli scrape --page-count 10
 ```
 
+Run with bounded retry handling:
+
+```bash
+./.venv/bin/python -m ktc_webscraping.cli scrape --page-count 10 --retry-attempts 2
+```
+
 Run with a visible browser:
 
 ```bash
@@ -129,6 +156,25 @@ The scraper writes to:
 - SQLite database: `db/ktc.db`
 - Table: `ktc_rankings`
 - Legacy `players` table: retired
+
+## Running Tests
+
+Fast local validation:
+
+```bash
+make lint
+make test
+```
+
+Direct commands:
+
+```bash
+./.venv/bin/python -m ruff check .
+./.venv/bin/python -m ruff format --check .
+./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+```
+
+These are the same quality gates enforced in GitHub Actions, which keeps local verification aligned with pull request expectations.
 
 ## Data Model
 
@@ -214,6 +260,8 @@ KTC_DATABASE_URL=sqlite:///db/ktc.db ./.venv/bin/python -m ktc_webscraping.cli
 ```
 
 The shared runtime defaults live in [ktc_webscraping/config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/config.py), which keeps environment-based setup logic separate from the CLI behavior.
+Logging defaults live in [logging_config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/logging_config.py) and can be adjusted with `KTC_LOG_LEVEL`.
+Page retry behavior is controlled through the CLI `--retry-attempts` flag.
 
 Current CI-quality gate commands:
 
@@ -223,9 +271,9 @@ Current CI-quality gate commands:
 ./.venv/bin/python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
 ```
 
-## CI/CD Roadmap
+## CI/CD Enforcement
 
-CI/CD is the main portfolio story this repo is growing toward.
+CI/CD is one of the main portfolio signals in this project because it proves the repo is not relying on manual trust.
 
 The implementation path is deliberately staged:
 
@@ -235,7 +283,7 @@ The implementation path is deliberately staged:
 4. Add scheduled execution for recurring scrapes.
 5. Promote persistence from local SQLite to a hosted database with environment-based configuration.
 
-That progression is useful in interviews because it mirrors real delivery work: stabilize the code first, then automate validation, then automate execution, then harden deployment boundaries.
+That progression is useful in interviews because it mirrors real delivery work: stabilize the code first, then enforce validation, then automate execution, then harden deployment boundaries.
 
 Current GitHub Actions scope:
 
@@ -246,7 +294,7 @@ Current GitHub Actions scope:
 - formatting validation
 - automated test execution for the core Python package
 - coverage reporting in the job logs for the deterministic, CI-friendly package modules
-- failure on regression
+- failure on lint, formatting, or test regression
 - later additions such as scheduled scrape runs
 
 Current workflow file:
@@ -268,6 +316,11 @@ The workflow has been manually verified on `main`, and scheduled runs are now co
 For this phase, the automation path uses database-backed persistence inside the workflow run and publishes the SQLite database as an artifact for inspection. That keeps the execution path aligned with the application architecture while avoiding Git commit-back of binary runtime state.
 
 When hosted persistence is introduced, the workflow is already prepared to read `KTC_DATABASE_URL` from GitHub Secrets. If that secret is absent, the workflow continues using the artifact-backed SQLite path.
+
+This matters for the remote QA / SDET story because it shows the repo handles both kinds of automation work:
+
+- validation automation through CI on code changes
+- operational automation through scheduled execution on a recurring cadence
 
 ## Repository Layout
 
@@ -291,10 +344,11 @@ When hosted persistence is introduced, the workflow is already prepared to read 
 ## Local Data Handling
 
 - `db/ktc.db` is local runtime state and should not be committed
-- representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json)
+- representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json) and [ktc_rankings_sample.csv](/home/vhinson/dev/KTC-Webscraping/data/samples/ktc_rankings_sample.csv)
 - repeated scrape runs on different dates accumulate historical rows in `ktc_rankings`
 - duplicate prevention and upsert behavior apply within the same `scrape_date` and `source`
 - legacy `players` tables are automatically retired when the current load layer initializes the database
+- load-time validation now rejects records missing required fields like `scrape_date`, `player_name`, `position`, or `source`
 
 Inspect the local database:
 
@@ -303,6 +357,8 @@ sqlite3 db/ktc.db ".tables"
 sqlite3 db/ktc.db "SELECT scrape_date, player_name, rank_overall, rank_position, team FROM ktc_rankings ORDER BY scrape_date DESC, rank_overall ASC LIMIT 20;"
 ```
 
+Starter analytics queries live in [analytics_queries.sql](/home/vhinson/dev/KTC-Webscraping/data/samples/analytics_queries.sql) for quick SQLite exploration.
+
 ## Roadmap
 
 The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/todo.md).
@@ -310,8 +366,7 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 Immediate next phases:
 
 - Phase 6: hosted database readiness is deferred
-- Phase 7: professional CLI and developer experience is now in place
-- Phase 8: README positioning refinements
+- Phase 10: resume and interview readiness
 
 ## Resume-Style Talking Points
 
