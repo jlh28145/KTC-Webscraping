@@ -31,6 +31,7 @@ DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
 LOGGER = getLogger(__name__)
 
+
 def detect_block_page(page_source: str) -> str | None:
     """Return a likely anti-bot marker when the page looks blocked."""
 
