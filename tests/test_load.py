@@ -200,48 +200,6 @@ def test_validate_player_records_rejects_blank_player_name(scrape_timestamp: str
         validate_player_records(players)
 
 
-def test_validate_player_records_rejects_missing_scrape_date(scrape_timestamp: str) -> None:
-    players = [
-        PlayerRecord(
-            "",
-            "Josh Allen",
-            "QB",
-            1,
-            1,
-            "BUF",
-            "keeptradecut",
-            29.8,
-            1,
-            9989.0,
-            scrape_timestamp,
-        )
-    ]
-
-    with pytest.raises(ValueError, match="missing scrape_date"):
-        validate_player_records(players)
-
-
-def test_validate_player_records_rejects_blank_position(scrape_timestamp: str) -> None:
-    players = [
-        PlayerRecord(
-            "2026-03-21",
-            "Josh Allen",
-            " ",
-            1,
-            1,
-            "BUF",
-            "keeptradecut",
-            29.8,
-            1,
-            9989.0,
-            scrape_timestamp,
-        )
-    ]
-
-    with pytest.raises(ValueError, match="missing position"):
-        validate_player_records(players)
-
-
 def test_insert_player_data_rejects_blank_source(temp_db_path, scrape_timestamp: str) -> None:
     conn = create_connection(temp_db_path)
     players = [

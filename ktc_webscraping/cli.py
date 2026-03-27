@@ -95,7 +95,7 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--retry-attempts",
         type=positive_int,
-        default=int(os.getenv("KTC_RETRY_ATTEMPTS", "2")),
+        default=2,
         help="Number of retry attempts for a page after the initial failure.",
     )
     parser.add_argument(
@@ -125,8 +125,6 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint for scraping and persistence workflows."""
-
     configure_logging()
     parser = build_parser()
     raw_argv = argv if argv is not None else sys.argv[1:]

@@ -64,6 +64,19 @@ The repo is organized around one repeatable engineering loop:
 
 That flow matters for the portfolio story because it shows validation, automation, and persistence working together instead of existing as disconnected bullet points.
 
+## Workflow Overview
+
+The repo is organized around one repeatable engineering loop:
+
+1. Run the scraper locally through the CLI.
+2. Normalize ranking rows into deterministic `PlayerRecord` objects.
+3. Persist historical snapshots into SQLite.
+4. Validate changes with Ruff and `pytest` before merge.
+5. Let GitHub Actions rerun the same checks on push and pull request.
+6. Let the scheduled workflow execute the scraper automatically and publish artifacts.
+
+That flow matters for the portfolio story because it shows validation, automation, and persistence working together instead of existing as disconnected bullet points.
+
 ## Architecture
 
 The scraper is organized as a small ETL package:
@@ -366,7 +379,8 @@ The implementation roadmap lives in [todo.md](/home/vhinson/dev/KTC-Webscraping/
 Immediate next phases:
 
 - Phase 6: hosted database readiness is deferred
-- Phase 10: resume and interview readiness
+- Phase 8: README positioning refinements are now in progress
+- Phase 9: code quality polish
 
 ## Resume-Style Talking Points
 

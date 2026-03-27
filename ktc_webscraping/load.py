@@ -56,8 +56,6 @@ def player_to_row(player: PlayerRecord) -> tuple:
 
 
 def validate_player_records(players: list[PlayerRecord]) -> None:
-    """Reject incomplete records before persistence to keep the database trustworthy."""
-
     for index, player in enumerate(players):
         if not player.scrape_date:
             raise ValueError(f"Player record at index {index} is missing scrape_date")
@@ -115,8 +113,6 @@ def create_connection(db_file: Path | str, database_url: str | None = None) -> s
 
 
 def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) -> None:
-    """Persist normalized player records into the historical rankings table."""
-
     validate_player_records(players)
     cursor = conn.cursor()
     cursor.executemany(
