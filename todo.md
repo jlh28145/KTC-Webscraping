@@ -335,12 +335,12 @@ Status: deferred until we decide to resume cloud services and external database 
 
 ## Recommended Build Order
 
-- [ ] 1. Activate repo
-- [ ] 2. Refactor architecture
-- [ ] 3. Write transform tests
-- [ ] 4. Add load tests with SQLite
-- [ ] 5. Add CI workflow
-- [ ] 6. Add scheduled automation
+- [X] 1. Activate repo
+- [X] 2. Refactor architecture
+- [X] 3. Write transform tests
+- [X] 4. Add load tests with SQLite
+- [X] 5. Add CI workflow
+- [X] 6. Add scheduled automation
 - [ ] 7. Upgrade to hosted Postgres
 - [ ] 8. Polish README and interview story
 
