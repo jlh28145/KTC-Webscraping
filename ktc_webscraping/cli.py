@@ -9,6 +9,7 @@ from .extract import (
     DEFAULT_BASE_URL,
     DEFAULT_MIN_ROWS_PER_PAGE,
     DEFAULT_PAGE_COUNT,
+    DEFAULT_ROW_COUNT_TOLERANCE,
     scrape_rankings,
 )
 from .load import build_database_config, create_connection, insert_player_data
@@ -30,6 +31,15 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def non_negative_int(value: str) -> int:
+    """Argparse validator for zero-or-greater integer CLI options."""
+
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be zero or a positive integer")
+    return parsed
+
+
 def build_config(args: argparse.Namespace) -> ScrapeConfig:
     """Map parsed CLI arguments into a strongly typed scrape config."""
 
@@ -39,6 +49,7 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         min_rows_per_page=args.min_rows_per_page,
         retry_attempts=args.retry_attempts,
         db_path=args.db_path,
+        row_count_tolerance=args.row_count_tolerance,
     )
 
 
@@ -97,6 +108,16 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
         type=positive_int,
         default=2,
         help="Number of retry attempts for a page after the initial failure.",
+    )
+    parser.add_argument(
+        "--row-count-tolerance",
+        type=non_negative_int,
+        default=DEFAULT_ROW_COUNT_TOLERANCE,
+        help=(
+            "Rows short of --min-rows-per-page still accepted as a complete page. "
+            "KeepTradeCut occasionally serves a page a few rows short of a full "
+            "page without any anti-bot markers; use 0 to require an exact match."
+        ),
     )
     parser.add_argument(
         "--headed",

@@ -37,3 +37,4 @@ class ScrapeConfig:
     min_rows_per_page: int
     retry_attempts: int
     db_path: Path
+    row_count_tolerance: int = 5

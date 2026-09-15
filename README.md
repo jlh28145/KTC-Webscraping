@@ -275,6 +275,7 @@ KTC_DATABASE_URL=sqlite:///db/ktc.db ./.venv/bin/python -m ktc_webscraping.cli
 The shared runtime defaults live in [ktc_webscraping/config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/config.py), which keeps environment-based setup logic separate from the CLI behavior.
 Logging defaults live in [logging_config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/logging_config.py) and can be adjusted with `KTC_LOG_LEVEL`.
 Page retry behavior is controlled through the CLI `--retry-attempts` flag.
+KeepTradeCut occasionally serves a fully-loaded rankings page a handful of rows short of a full page even though nothing looks blocked; `--row-count-tolerance` (default `5`) accepts that shortfall instead of failing the whole run. Pass `--row-count-tolerance 0` to require an exact match against `--min-rows-per-page`.
 
 Current CI-quality gate commands:
 

@@ -29,6 +29,7 @@ DEFAULT_BASE_URL = (
 )
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
+DEFAULT_ROW_COUNT_TOLERANCE = 5
 LOGGER = getLogger(__name__)
 
 
@@ -87,9 +88,21 @@ def close_popup(driver: webdriver.Chrome) -> None:
 
 
 def wait_for_rankings(
-    driver: webdriver.Chrome, wait: WebDriverWait, min_rows_per_page: int
+    driver: webdriver.Chrome,
+    wait: WebDriverWait,
+    min_rows_per_page: int,
+    row_count_tolerance: int = 0,
 ) -> None:
-    """Block until the rankings container is ready and populated."""
+    """Block until the rankings container is ready and populated.
+
+    KeepTradeCut occasionally serves a fully-loaded page (no anti-bot markers,
+    correct title/url) whose row count is a handful short of a normal full
+    page, likely from their rankings being recalculated mid-request. Once the
+    page has finished loading, that row count won't grow further, so retrying
+    the same request tends to reproduce the same shortfall. ``row_count_tolerance``
+    lets a page that is close enough to ``min_rows_per_page`` be accepted
+    instead of failing the whole run over a handful of missing rows.
+    """
 
     wait.until(
         lambda current_driver: (
@@ -115,6 +128,20 @@ def wait_for_rankings(
         current_url = driver.current_url
         block_marker = detect_block_page(page_source)
         row_count = len(driver.find_elements(By.CSS_SELECTOR, "#rankings-page-rankings .onePlayer"))
+
+        acceptable_floor = max(min_rows_per_page - row_count_tolerance, 1)
+        if block_marker is None and row_count >= acceptable_floor:
+            LOGGER.warning(
+                "Accepting short rankings page: wanted >= %s rows, found %s "
+                "(tolerance=%s). title=%r, url=%r",
+                min_rows_per_page,
+                row_count,
+                row_count_tolerance,
+                title,
+                current_url,
+            )
+            return
+
         detail = (
             f"Timed out waiting for rankings rows. title={title!r}, url={current_url!r}, "
             f"row_count={row_count}, block_marker={block_marker!r}"
@@ -128,11 +155,12 @@ def load_page_html(
     page_number: int,
     base_url: str,
     min_rows_per_page: int,
+    row_count_tolerance: int = 0,
 ) -> str:
     """Load one rankings page and return its HTML once the rows are available."""
 
     driver.get(base_url.format(page=page_number))
-    wait_for_rankings(driver, wait, min_rows_per_page)
+    wait_for_rankings(driver, wait, min_rows_per_page, row_count_tolerance)
     return driver.page_source
 
 
@@ -143,10 +171,13 @@ def extract_page_records(
     base_url: str,
     min_rows_per_page: int,
     scrape_timestamp: str,
+    row_count_tolerance: int = 0,
 ) -> list[PlayerRecord]:
     """Extract ranking records from one page using DOM and text-layout fallbacks."""
 
-    page_html = load_page_html(driver, wait, page_number, base_url, min_rows_per_page)
+    page_html = load_page_html(
+        driver, wait, page_number, base_url, min_rows_per_page, row_count_tolerance
+    )
     records = parse_player_rows(page_html, scrape_timestamp)
     if records:
         return records
@@ -192,6 +223,7 @@ def extract_page_records_with_retry(
     min_rows_per_page: int,
     scrape_timestamp: str,
     retry_attempts: int,
+    row_count_tolerance: int = 0,
 ) -> list[PlayerRecord]:
     """Retry page extraction a bounded number of times before failing the run."""
 
@@ -207,6 +239,7 @@ def extract_page_records_with_retry(
                 base_url=base_url,
                 min_rows_per_page=min_rows_per_page,
                 scrape_timestamp=scrape_timestamp,
+                row_count_tolerance=row_count_tolerance,
             )
         except RuntimeError as exc:
             last_error = exc
@@ -245,6 +278,7 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
                 min_rows_per_page=config.min_rows_per_page,
                 scrape_timestamp=scrape_timestamp,
                 retry_attempts=config.retry_attempts,
+                row_count_tolerance=config.row_count_tolerance,
             )
             all_players.extend(page_rows)
             LOGGER.info("Parsed %s rows from page %s", len(page_rows), page + 1)
