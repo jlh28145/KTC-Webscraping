@@ -98,6 +98,7 @@ def test_extract_page_records_with_retry_raises_after_final_attempt(monkeypatch)
 
 def test_wait_for_rankings_accepts_page_within_tolerance(monkeypatch) -> None:
     monkeypatch.setattr(extract, "close_popup", lambda driver: None)
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _FakeWait(driver))
     driver = _FakeDriver(row_count=48)
     wait = _FakeWait(driver)
 
@@ -106,6 +107,7 @@ def test_wait_for_rankings_accepts_page_within_tolerance(monkeypatch) -> None:
 
 def test_wait_for_rankings_raises_when_short_beyond_tolerance(monkeypatch) -> None:
     monkeypatch.setattr(extract, "close_popup", lambda driver: None)
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _FakeWait(driver))
     driver = _FakeDriver(row_count=10)
     wait = _FakeWait(driver)
 
@@ -115,6 +117,7 @@ def test_wait_for_rankings_raises_when_short_beyond_tolerance(monkeypatch) -> No
 
 def test_wait_for_rankings_raises_when_no_tolerance_configured(monkeypatch) -> None:
     monkeypatch.setattr(extract, "close_popup", lambda driver: None)
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _FakeWait(driver))
     driver = _FakeDriver(row_count=48)
     wait = _FakeWait(driver)
 
@@ -124,11 +127,37 @@ def test_wait_for_rankings_raises_when_no_tolerance_configured(monkeypatch) -> N
 
 def test_wait_for_rankings_raises_when_block_marker_detected(monkeypatch) -> None:
     monkeypatch.setattr(extract, "close_popup", lambda driver: None)
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _FakeWait(driver))
     driver = _FakeDriver(row_count=48, page_source="<html>please verify you are human</html>")
     wait = _FakeWait(driver)
 
     with pytest.raises(RuntimeError, match="block_marker='verify you are human'"):
         extract.wait_for_rankings(driver, wait, min_rows_per_page=50, row_count_tolerance=5)
+
+
+def test_wait_for_rankings_uses_short_poll_timeout_for_row_count(monkeypatch) -> None:
+    """The row-count phase must use its own short timeout, not the page-load wait."""
+
+    monkeypatch.setattr(extract, "close_popup", lambda driver: None)
+    observed_timeouts = []
+
+    def fake_web_driver_wait(driver, timeout):
+        observed_timeouts.append(timeout)
+        return _FakeWait(driver)
+
+    monkeypatch.setattr(extract, "WebDriverWait", fake_web_driver_wait)
+    driver = _FakeDriver(row_count=48)
+    wait = _FakeWait(driver)
+
+    extract.wait_for_rankings(
+        driver,
+        wait,
+        min_rows_per_page=50,
+        row_count_tolerance=5,
+        row_count_poll_timeout=7,
+    )
+
+    assert observed_timeouts == [7]
 
 
 class _StubDriver:

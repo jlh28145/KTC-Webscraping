@@ -10,6 +10,7 @@ from .extract import (
     DEFAULT_MIN_ROWS_PER_PAGE,
     DEFAULT_PAGE_COUNT,
     DEFAULT_PAGE_DELAY_SECONDS,
+    DEFAULT_ROW_COUNT_POLL_TIMEOUT,
     DEFAULT_ROW_COUNT_TOLERANCE,
     scrape_rankings,
 )
@@ -61,6 +62,7 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         db_path=args.db_path,
         row_count_tolerance=args.row_count_tolerance,
         page_delay_seconds=args.page_delay_seconds,
+        row_count_poll_timeout=args.row_count_poll_timeout,
     )
 
 
@@ -138,6 +140,16 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
             "Base delay (plus random jitter up to the same amount) between "
             "successful page loads, to avoid bursting requests at KeepTradeCut. "
             "Use 0 to disable the delay."
+        ),
+    )
+    parser.add_argument(
+        "--row-count-poll-timeout",
+        type=positive_int,
+        default=DEFAULT_ROW_COUNT_POLL_TIMEOUT,
+        help=(
+            "Seconds to poll for --min-rows-per-page rows before falling back to "
+            "--row-count-tolerance. The row count doesn't grow with more waiting, "
+            "so this is intentionally much shorter than the page-load timeout."
         ),
     )
     parser.add_argument(

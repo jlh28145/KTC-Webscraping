@@ -37,5 +37,6 @@ class ScrapeConfig:
     min_rows_per_page: int
     retry_attempts: int
     db_path: Path
-    row_count_tolerance: int = 5
+    row_count_tolerance: int = 10
     page_delay_seconds: float = 3.0
+    row_count_poll_timeout: int = 15

@@ -30,7 +30,8 @@ DEFAULT_BASE_URL = (
 )
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
-DEFAULT_ROW_COUNT_TOLERANCE = 5
+DEFAULT_ROW_COUNT_TOLERANCE = 10
+DEFAULT_ROW_COUNT_POLL_TIMEOUT = 15
 DEFAULT_PAGE_DELAY_SECONDS = 3.0
 LOGGER = getLogger(__name__)
 
@@ -94,16 +95,20 @@ def wait_for_rankings(
     wait: WebDriverWait,
     min_rows_per_page: int,
     row_count_tolerance: int = 0,
+    row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
 ) -> None:
     """Block until the rankings container is ready and populated.
 
-    KeepTradeCut occasionally serves a fully-loaded page (no anti-bot markers,
-    correct title/url) whose row count is a handful short of a normal full
-    page, likely from their rankings being recalculated mid-request. Once the
-    page has finished loading, that row count won't grow further, so retrying
-    the same request tends to reproduce the same shortfall. ``row_count_tolerance``
-    lets a page that is close enough to ``min_rows_per_page`` be accepted
-    instead of failing the whole run over a handful of missing rows.
+    KeepTradeCut regularly serves a fully-loaded page (no anti-bot markers,
+    correct title/url) whose row count lands a bit short of a normal full
+    page. That shortfall doesn't recover with more waiting: the row count is
+    already settled once the page reports ``readyState == "complete"``, and
+    stays essentially the same across repeated attempts at the same page.
+    ``row_count_tolerance`` accepts a page that's close enough instead of
+    failing the whole run over it. Because waiting longer never helps, the
+    row-count check uses its own short ``row_count_poll_timeout`` (rather
+    than the much longer page-load ``wait``) so a page that's going to land
+    short does so quickly instead of burning a minute per attempt.
     """
 
     wait.until(
@@ -113,8 +118,9 @@ def wait_for_rankings(
     )
     close_popup(driver)
 
+    row_count_wait = WebDriverWait(driver, row_count_poll_timeout)
     try:
-        wait.until(
+        row_count_wait.until(
             lambda current_driver: (
                 len(
                     current_driver.find_elements(
@@ -158,11 +164,12 @@ def load_page_html(
     base_url: str,
     min_rows_per_page: int,
     row_count_tolerance: int = 0,
+    row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
 ) -> str:
     """Load one rankings page and return its HTML once the rows are available."""
 
     driver.get(base_url.format(page=page_number))
-    wait_for_rankings(driver, wait, min_rows_per_page, row_count_tolerance)
+    wait_for_rankings(driver, wait, min_rows_per_page, row_count_tolerance, row_count_poll_timeout)
     return driver.page_source
 
 
@@ -174,11 +181,18 @@ def extract_page_records(
     min_rows_per_page: int,
     scrape_timestamp: str,
     row_count_tolerance: int = 0,
+    row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
 ) -> list[PlayerRecord]:
     """Extract ranking records from one page using DOM and text-layout fallbacks."""
 
     page_html = load_page_html(
-        driver, wait, page_number, base_url, min_rows_per_page, row_count_tolerance
+        driver,
+        wait,
+        page_number,
+        base_url,
+        min_rows_per_page,
+        row_count_tolerance,
+        row_count_poll_timeout,
     )
     records = parse_player_rows(page_html, scrape_timestamp)
     if records:
@@ -226,6 +240,7 @@ def extract_page_records_with_retry(
     scrape_timestamp: str,
     retry_attempts: int,
     row_count_tolerance: int = 0,
+    row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
 ) -> list[PlayerRecord]:
     """Retry page extraction a bounded number of times before failing the run."""
 
@@ -242,6 +257,7 @@ def extract_page_records_with_retry(
                 min_rows_per_page=min_rows_per_page,
                 scrape_timestamp=scrape_timestamp,
                 row_count_tolerance=row_count_tolerance,
+                row_count_poll_timeout=row_count_poll_timeout,
             )
         except RuntimeError as exc:
             last_error = exc
@@ -292,6 +308,7 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
                     scrape_timestamp=scrape_timestamp,
                     retry_attempts=config.retry_attempts,
                     row_count_tolerance=config.row_count_tolerance,
+                    row_count_poll_timeout=config.row_count_poll_timeout,
                 )
             except RuntimeError as exc:
                 LOGGER.error("Skipping page %s after repeated failures: %s", page + 1, exc)
