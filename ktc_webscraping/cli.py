@@ -9,6 +9,7 @@ from .extract import (
     DEFAULT_BASE_URL,
     DEFAULT_MIN_ROWS_PER_PAGE,
     DEFAULT_PAGE_COUNT,
+    DEFAULT_PAGE_DELAY_SECONDS,
     DEFAULT_ROW_COUNT_TOLERANCE,
     scrape_rankings,
 )
@@ -40,6 +41,15 @@ def non_negative_int(value: str) -> int:
     return parsed
 
 
+def non_negative_float(value: str) -> float:
+    """Argparse validator for zero-or-greater float CLI options."""
+
+    parsed = float(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("value must be zero or a positive number")
+    return parsed
+
+
 def build_config(args: argparse.Namespace) -> ScrapeConfig:
     """Map parsed CLI arguments into a strongly typed scrape config."""
 
@@ -50,6 +60,7 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         retry_attempts=args.retry_attempts,
         db_path=args.db_path,
         row_count_tolerance=args.row_count_tolerance,
+        page_delay_seconds=args.page_delay_seconds,
     )
 
 
@@ -117,6 +128,16 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
             "Rows short of --min-rows-per-page still accepted as a complete page. "
             "KeepTradeCut occasionally serves a page a few rows short of a full "
             "page without any anti-bot markers; use 0 to require an exact match."
+        ),
+    )
+    parser.add_argument(
+        "--page-delay-seconds",
+        type=non_negative_float,
+        default=DEFAULT_PAGE_DELAY_SECONDS,
+        help=(
+            "Base delay (plus random jitter up to the same amount) between "
+            "successful page loads, to avoid bursting requests at KeepTradeCut. "
+            "Use 0 to disable the delay."
         ),
     )
     parser.add_argument(

@@ -21,6 +21,7 @@ def test_build_parser_uses_expected_defaults() -> None:
     assert args.min_rows_per_page == cli.DEFAULT_MIN_ROWS_PER_PAGE
     assert args.retry_attempts == 2
     assert args.row_count_tolerance == cli.DEFAULT_ROW_COUNT_TOLERANCE
+    assert args.page_delay_seconds == cli.DEFAULT_PAGE_DELAY_SECONDS
     assert args.headed is False
 
 
@@ -41,6 +42,8 @@ def test_build_config_maps_args_into_scrape_config(tmp_path: Path) -> None:
             "4",
             "--row-count-tolerance",
             "3",
+            "--page-delay-seconds",
+            "1.5",
             "--headed",
         ]
     )
@@ -53,6 +56,7 @@ def test_build_config_maps_args_into_scrape_config(tmp_path: Path) -> None:
     assert config.min_rows_per_page == 25
     assert config.retry_attempts == 4
     assert config.row_count_tolerance == 3
+    assert config.page_delay_seconds == 1.5
 
 
 def test_parser_rejects_non_positive_page_count() -> None:
@@ -75,6 +79,21 @@ def test_parser_accepts_zero_row_count_tolerance() -> None:
     args = parser.parse_args(["scrape", "--row-count-tolerance", "0"])
 
     assert args.row_count_tolerance == 0
+
+
+def test_parser_rejects_negative_page_delay_seconds() -> None:
+    parser = cli.build_parser()
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["scrape", "--page-delay-seconds", "-1"])
+
+
+def test_parser_accepts_zero_page_delay_seconds() -> None:
+    parser = cli.build_parser()
+
+    args = parser.parse_args(["scrape", "--page-delay-seconds", "0"])
+
+    assert args.page_delay_seconds == 0
 
 
 def test_run_uses_load_and_extract_layers(monkeypatch, tmp_path: Path, capsys) -> None:

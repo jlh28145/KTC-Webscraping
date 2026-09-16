@@ -1,4 +1,5 @@
 import os
+import random
 import time
 from datetime import datetime
 from logging import getLogger
@@ -30,6 +31,7 @@ DEFAULT_BASE_URL = (
 DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
 DEFAULT_ROW_COUNT_TOLERANCE = 5
+DEFAULT_PAGE_DELAY_SECONDS = 3.0
 LOGGER = getLogger(__name__)
 
 
@@ -261,28 +263,63 @@ def extract_page_records_with_retry(
 
 
 def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerRecord]:
-    """Scrape all configured pages and return normalized player records."""
+    """Scrape all configured pages and return normalized player records.
+
+    Pages are requested with a small delay (plus jitter) between them to
+    avoid bursting requests at KeepTradeCut, which appears to progressively
+    trim row counts on rapid sequential requests from the same source
+    (e.g. shared CI runner IPs) without ever showing an explicit block page.
+    A single page that fails every retry is logged and skipped rather than
+    discarding every other page already scraped in the same run; the run
+    only fails outright if every page failed.
+    """
 
     driver, wait = build_driver(headless=headless)
     all_players: list[PlayerRecord] = []
+    failed_pages: list[int] = []
 
     try:
         for page in range(config.page_count):
             LOGGER.info("Scraping page %s of %s", page + 1, config.page_count)
             scrape_timestamp = datetime.now().isoformat()
-            page_rows = extract_page_records_with_retry(
-                driver=driver,
-                wait=wait,
-                page_number=page,
-                base_url=config.base_url,
-                min_rows_per_page=config.min_rows_per_page,
-                scrape_timestamp=scrape_timestamp,
-                retry_attempts=config.retry_attempts,
-                row_count_tolerance=config.row_count_tolerance,
-            )
+            try:
+                page_rows = extract_page_records_with_retry(
+                    driver=driver,
+                    wait=wait,
+                    page_number=page,
+                    base_url=config.base_url,
+                    min_rows_per_page=config.min_rows_per_page,
+                    scrape_timestamp=scrape_timestamp,
+                    retry_attempts=config.retry_attempts,
+                    row_count_tolerance=config.row_count_tolerance,
+                )
+            except RuntimeError as exc:
+                LOGGER.error("Skipping page %s after repeated failures: %s", page + 1, exc)
+                failed_pages.append(page + 1)
+                continue
+
             all_players.extend(page_rows)
             LOGGER.info("Parsed %s rows from page %s", len(page_rows), page + 1)
+
+            is_last_page = page == config.page_count - 1
+            if not is_last_page and config.page_delay_seconds > 0:
+                delay = config.page_delay_seconds + random.uniform(0, config.page_delay_seconds)
+                time.sleep(delay)
     finally:
         driver.quit()
+
+    if failed_pages:
+        LOGGER.warning(
+            "Completed scrape with %s of %s page(s) failed: %s",
+            len(failed_pages),
+            config.page_count,
+            failed_pages,
+        )
+
+    if not all_players:
+        raise RuntimeError(
+            f"All {config.page_count} page(s) failed; nothing was scraped. "
+            f"Failed pages: {failed_pages}"
+        )
 
     return all_players

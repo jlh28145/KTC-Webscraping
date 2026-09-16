@@ -38,3 +38,4 @@ class ScrapeConfig:
     retry_attempts: int
     db_path: Path
     row_count_tolerance: int = 5
+    page_delay_seconds: float = 3.0

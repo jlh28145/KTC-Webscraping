@@ -276,6 +276,7 @@ The shared runtime defaults live in [ktc_webscraping/config.py](/home/vhinson/de
 Logging defaults live in [logging_config.py](/home/vhinson/dev/KTC-Webscraping/ktc_webscraping/logging_config.py) and can be adjusted with `KTC_LOG_LEVEL`.
 Page retry behavior is controlled through the CLI `--retry-attempts` flag.
 KeepTradeCut occasionally serves a fully-loaded rankings page a handful of rows short of a full page even though nothing looks blocked; `--row-count-tolerance` (default `5`) accepts that shortfall instead of failing the whole run. Pass `--row-count-tolerance 0` to require an exact match against `--min-rows-per-page`.
+The row shortfall has been observed to grow across sequential page requests within one run (page 1 a couple rows short, page 2 several more), consistent with KeepTradeCut trimming responses under rapid repeated requests from the same source. `--page-delay-seconds` (default `3.0`, plus random jitter up to the same amount) adds a pause between page loads to keep the request rate polite; pass `0` to disable it. Separately, if one page still fails every retry, the scraper now logs it and moves on instead of discarding every other page already scraped in the same run — the run only fails outright if every page failed.
 
 Current CI-quality gate commands:
 
