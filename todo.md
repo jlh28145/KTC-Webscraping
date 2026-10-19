@@ -9,28 +9,12 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 
 ## Current Status
 
-- Phase 0 is complete
-- Phase 1 is complete
-- Phase 2 is complete
-- Phase 3 is complete
-- Phase 4 is complete
-- Phase 5 is complete
-- Phase 8 is complete
-- Phase 9 is complete
-- Live Phase 1 scrape is verified through `./.venv/bin/python -m ktc_webscraping.cli --page-count 10`
-- Most recent verified full run inserted `500` records into `db/ktc.db`
-- `pytest` coverage is in place for transform, extract, load, logging, and CLI behavior
-- GitHub Actions CI is active and green
-- Ruff and coverage checks are part of the CI workflow
-- Current local CI-equivalent validation passes with 47 tests and 94% coverage
-- Historical SQLite persistence is now modeled through `ktc_rankings`
-- Scheduled automation workflow is active and verified on `main`
-- Phase 6 is on hold while cloud services and external connections are deferred
-- Phase 7 is complete with a polished CLI, shared config, `.env.example`, and `Makefile` workflow
-- Phase 8 is complete with README positioning refinements for remote QA / SDET roles
-- Phase 9 is complete with logging, retry handling, stronger validation, and cleanup across the package
-- Hosted Postgres database work is intentionally paused pending a later phase revisit
-- Database URL configuration paths still support local SQLite now and future hosted Postgres later
+As of 2026-10-19:
+
+- Phases 0–5 and 7–9 are complete; the finish-up phases (11–15, below) are complete or in review
+- 114 deterministic tests, 98% coverage over every module (including Selenium extract), 90% gate in CI
+- The daily scheduled scrape is green (500 rankings per run) and now accumulates history through the Actions cache
+- Next: Phase 6 hosted Postgres, then Phase 10 resume and interview material
 
 ---
 
@@ -301,6 +285,16 @@ Status: deferred until we decide to resume cloud services and external database 
 
 ---
 
+## Phases 11–15 - Finish-Up Pass (from the October 2026 repo review)
+
+- [X] Phase 11: retries cover Selenium exceptions; free-agent name/team split; one UTC timestamp per run; upserts refresh `scraped_at`; scheduled runs keep history (PR #10)
+- [X] Phase 12: HTML parser supports KeepTradeCut's current layout, guarded by a golden-file fixture of real markup; config loaded when the CLI runs; dead files removed; `extract.py` counted in coverage (PR #11)
+- [X] Phase 13: API reads shared config, opens the DB read-only, returns proper 404/503 status codes, defaults to the latest snapshot; 24 `TestClient` tests (PR #12)
+- [X] Phase 14: `pyproject.toml` package with `ktc-scrape` entry point and extras; `uv`-generated lock with a 14-day release cooldown (PR #13)
+- [X] Phase 15: README rewritten for hiring-manager readers with relative links and an architecture diagram
+
+---
+
 ## Phase 10 - Make It Resume and Interview Ready
 
 ### Resume translation
@@ -342,7 +336,7 @@ Status: deferred until we decide to resume cloud services and external database 
 - [X] 5. Add CI workflow
 - [X] 6. Add scheduled automation
 - [ ] 7. Upgrade to hosted Postgres
-- [ ] 8. Polish README and interview story
+- [X] 8. Polish README (interview story remains in Phase 10)
 
 ---
 
