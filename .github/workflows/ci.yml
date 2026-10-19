@@ -29,6 +29,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install --no-deps -e .
 
       - name: Run Ruff lint checks
         run: ruff check .
@@ -38,3 +39,6 @@ jobs:
 
       - name: Run pytest
         run: python -m pytest --cov --cov-report=term-missing --cov-fail-under=90
+
+      - name: Smoke-test the installed ktc-scrape entry point
+        run: ktc-scrape --help

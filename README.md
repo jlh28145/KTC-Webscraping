@@ -109,8 +109,11 @@ This separation matters for CI/CD because it makes the transform and load layers
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt   # pinned lock generated from pyproject.toml
+pip install --no-deps -e .        # installs the package and the ktc-scrape command
 ```
+
+Or simply `make install`. Dependencies are declared in `pyproject.toml` (runtime, plus `api`, `dashboard`, and `dev` extras); `make lock` regenerates the pinned `requirements.txt` with `uv`, skipping releases newer than 14 days.
 
 Optional local environment file:
 
@@ -133,7 +136,13 @@ Python target:
 
 ## Running the Scraper
 
-Preferred package entrypoint:
+Preferred entrypoint (installed by `make install`):
+
+```bash
+ktc-scrape --page-count 10
+```
+
+Equivalent module form:
 
 ```bash
 ./.venv/bin/python -m ktc_webscraping.cli --page-count 10
