@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 from ktc_webscraping import extract
 from ktc_webscraping.models import PlayerRecord, ScrapeConfig
@@ -94,6 +94,34 @@ def test_extract_page_records_with_retry_raises_after_final_attempt(monkeypatch)
             scrape_timestamp="2026-03-21T00:00:00",
             retry_attempts=2,
         )
+
+
+@pytest.mark.parametrize(
+    "error",
+    [TimeoutException("readyState never completed"), WebDriverException("net::ERR_TIMED_OUT")],
+)
+def test_extract_page_records_with_retry_retries_selenium_errors(monkeypatch, error) -> None:
+    observed = {"calls": 0}
+
+    def fake_extract_page_records(**kwargs):
+        observed["calls"] += 1
+        raise error
+
+    monkeypatch.setattr(extract, "extract_page_records", fake_extract_page_records)
+    monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(RuntimeError, match="Page 1 failed after 3 attempts"):
+        extract.extract_page_records_with_retry(
+            driver=object(),
+            wait=object(),
+            page_number=0,
+            base_url="https://example.com?page={page}",
+            min_rows_per_page=1,
+            scrape_timestamp="2026-03-21T00:00:00",
+            retry_attempts=2,
+        )
+
+    assert observed["calls"] == 3
 
 
 def test_wait_for_rankings_accepts_page_within_tolerance(monkeypatch) -> None:
@@ -227,3 +255,28 @@ def test_scrape_rankings_raises_when_every_page_fails(monkeypatch, tmp_path: Pat
 
     with pytest.raises(RuntimeError, match="All 2 page.s. failed"):
         extract.scrape_rankings(config=config, headless=True)
+
+
+def test_scrape_rankings_uses_one_utc_timestamp_for_every_page(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(extract, "build_driver", lambda headless: (_StubDriver(), object()))
+    observed_timestamps: list[str] = []
+
+    def fake_extract_with_retry(**kwargs):
+        observed_timestamps.append(kwargs["scrape_timestamp"])
+        return [_make_player(kwargs["page_number"])]
+
+    monkeypatch.setattr(extract, "extract_page_records_with_retry", fake_extract_with_retry)
+    monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
+
+    config = ScrapeConfig(
+        base_url="https://example.com?page={page}",
+        page_count=3,
+        min_rows_per_page=1,
+        retry_attempts=0,
+        db_path=tmp_path / "run.db",
+    )
+
+    extract.scrape_rankings(config=config, headless=True)
+
+    assert len(set(observed_timestamps)) == 1
+    assert observed_timestamps[0].endswith("+00:00")

@@ -81,7 +81,7 @@ def parse_player_text_lines(lines: list[str], scrape_timestamp: str) -> PlayerRe
     team = None
 
     position_index = 2
-    if len(cleaned) > 3 and re.fullmatch(r"[A-Z]{2,3}|FA|R FA", cleaned[2]):
+    if len(cleaned) > 3 and re.fullmatch(r"[A-Z]{3}|FA|R FA", cleaned[2]):
         team = cleaned[2]
         position_index = 3
 
@@ -136,10 +136,19 @@ def parse_player_text_lines(lines: list[str], scrape_timestamp: str) -> PlayerRe
 
 
 def split_name_and_team(player_line: str) -> tuple[str, str | None]:
-    match = re.match(r"^(?P<name>.+?)(?P<team>R FA|FA|[A-Z]{2,3})$", player_line.strip())
-    if not match:
-        return player_line.strip(), None
-    return match.group("name").strip(), match.group("team")
+    """Split a text-layout line like ``"Kenneth Walker IIIKCC"`` into name and team.
+
+    KeepTradeCut uses three-letter team codes (``KCC``, ``SFO``) plus ``FA`` and
+    ``R FA``. Free-agent suffixes are checked first so a name ending in capitals
+    (``"Kenneth Walker IIIFA"``) isn't misread as ``"...II"`` plus ``"IFA"``.
+    """
+
+    line = player_line.strip()
+    for pattern in (r"(?P<name>.+?)(?P<team>R FA|FA)", r"(?P<name>.+)(?P<team>[A-Z]{3})"):
+        match = re.fullmatch(pattern, line)
+        if match:
+            return match.group("name").strip(), match.group("team")
+    return line, None
 
 
 def extract_rankings_text_lines(page_html: str) -> list[str]:
@@ -172,9 +181,7 @@ def parse_player_rows_from_text(lines: list[str], scrape_timestamp: str) -> list
         if index + 2 >= len(lines):
             break
 
-        player_line = lines[index + 1]
         position_text = lines[index + 2]
-        player_name, team = split_name_and_team(player_line)
 
         if position_text == "PICK":
             record = parse_player_text_lines(lines[index : index + 6], scrape_timestamp)
