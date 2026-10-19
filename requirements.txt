@@ -93,6 +93,10 @@ pluggy==1.6.0
     #   pytest-cov
 protobuf==7.36.2
     # via streamlit
+psycopg==3.3.6
+    # via ktc-webscraping (pyproject.toml)
+psycopg-binary==3.3.6
+    # via psycopg
 pyarrow==25.0.1
     # via streamlit
 pydantic==2.13.5
@@ -168,6 +172,7 @@ typing-extensions==4.16.0
     #   fastapi
     #   httpx2
     #   opentelemetry-api
+    #   psycopg
     #   pydantic
     #   pydantic-core
     #   referencing

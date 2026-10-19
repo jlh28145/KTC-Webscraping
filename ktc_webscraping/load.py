@@ -1,7 +1,49 @@
+from __future__ import annotations
+
 import sqlite3
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, TypeAlias
 
 from .models import DatabaseConfig, PlayerRecord
+
+if TYPE_CHECKING:
+    import psycopg
+
+DatabaseConnection: TypeAlias = "sqlite3.Connection | psycopg.Connection"
+
+
+@dataclass(frozen=True)
+class SqlDialect:
+    """The few SQL details that differ between SQLite and Postgres."""
+
+    placeholder: str
+    id_column: str
+    float_type: str
+
+
+SQLITE = SqlDialect(
+    placeholder="?", id_column="INTEGER PRIMARY KEY AUTOINCREMENT", float_type="REAL"
+)
+POSTGRES = SqlDialect(
+    placeholder="%s",
+    id_column="BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
+    float_type="DOUBLE PRECISION",
+)
+
+RANKING_COLUMNS = (
+    "scrape_date",
+    "player_name",
+    "position",
+    "rank_overall",
+    "rank_position",
+    "team",
+    "source",
+    "age",
+    "tier",
+    "value",
+    "scraped_at",
+)
 
 
 def build_database_config(
@@ -67,25 +109,10 @@ def validate_player_records(players: list[PlayerRecord]) -> None:
             raise ValueError(f"Player record at index {index} is missing source")
 
 
-def create_connection(db_file: Path | str, database_url: str | None = None) -> sqlite3.Connection:
-    """Create the local SQLite connection and ensure the supported schema exists."""
-
-    database_config = build_database_config(db_path=db_file, database_url=database_url)
-    if database_config.scheme != "sqlite" or database_config.sqlite_path is None:
-        raise NotImplementedError(
-            "Postgres connectivity is not implemented yet. "
-            "Use SQLite locally or add a Postgres client in Phase 6."
-        )
-
-    db_path = database_config.sqlite_path
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute(
-        """
+def create_table_sql(dialect: SqlDialect) -> str:
+    return f"""
         CREATE TABLE IF NOT EXISTS ktc_rankings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {dialect.id_column},
             scrape_date TEXT NOT NULL,
             player_name TEXT,
             position TEXT,
@@ -93,46 +120,26 @@ def create_connection(db_file: Path | str, database_url: str | None = None) -> s
             rank_position INTEGER,
             team TEXT,
             source TEXT NOT NULL,
-            age REAL,
+            age {dialect.float_type},
             tier INTEGER,
-            value REAL,
+            value {dialect.float_type},
             scraped_at TEXT
         )
         """
-    )
-    cursor.execute(
-        """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_ktc_rankings_scrape_date_player_source
-        ON ktc_rankings (scrape_date, player_name, source)
-        """
-    )
-    cursor.execute("DROP TABLE IF EXISTS players")
-    cursor.execute("DROP INDEX IF EXISTS idx_players_player_name_scraped_at")
-    conn.commit()
-    return conn
 
 
-def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) -> None:
-    validate_player_records(players)
-    cursor = conn.cursor()
-    cursor.executemany(
-        """
-        INSERT INTO ktc_rankings
-        (
-            scrape_date,
-            player_name,
-            position,
-            rank_overall,
-            rank_position,
-            team,
-            source,
-            age,
-            tier,
-            value,
-            scraped_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(scrape_date, player_name, source) DO UPDATE SET
+CREATE_UNIQUE_INDEX_SQL = """
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ktc_rankings_scrape_date_player_source
+    ON ktc_rankings (scrape_date, player_name, source)
+    """
+
+
+def upsert_sql(dialect: SqlDialect) -> str:
+    placeholders = ", ".join([dialect.placeholder] * len(RANKING_COLUMNS))
+    return f"""
+        INSERT INTO ktc_rankings ({", ".join(RANKING_COLUMNS)})
+        VALUES ({placeholders})
+        ON CONFLICT (scrape_date, player_name, source) DO UPDATE SET
             position = excluded.position,
             rank_overall = excluded.rank_overall,
             rank_position = excluded.rank_position,
@@ -141,7 +148,52 @@ def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) ->
             tier = excluded.tier,
             value = excluded.value,
             scraped_at = excluded.scraped_at
-        """,
-        [player_to_row(player) for player in players],
-    )
+        """
+
+
+def dialect_for(conn: DatabaseConnection) -> SqlDialect:
+    return SQLITE if isinstance(conn, sqlite3.Connection) else POSTGRES
+
+
+def create_connection(db_file: Path | str, database_url: str | None = None) -> DatabaseConnection:
+    """Open the configured database (SQLite or Postgres) and ensure the schema exists."""
+
+    database_config = build_database_config(db_path=db_file, database_url=database_url)
+    if database_config.scheme == "postgresql":
+        conn = _connect_postgres(database_config.url)
+    else:
+        assert database_config.sqlite_path is not None
+        database_config.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(database_config.sqlite_path)
+
+    dialect = dialect_for(conn)
+    cursor = conn.cursor()
+    cursor.execute(create_table_sql(dialect))
+    cursor.execute(CREATE_UNIQUE_INDEX_SQL)
+    if dialect is SQLITE:
+        # Retire the table used by the original prototype scraper.
+        cursor.execute("DROP TABLE IF EXISTS players")
+        cursor.execute("DROP INDEX IF EXISTS idx_players_player_name_scraped_at")
+    conn.commit()
+    return conn
+
+
+def _connect_postgres(url: str) -> psycopg.Connection:
+    try:
+        import psycopg
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Postgres support needs psycopg: pip install 'ktc-webscraping[postgres]'"
+        ) from exc
+    return psycopg.connect(url, connect_timeout=10)
+
+
+def insert_player_data(conn: DatabaseConnection, players: list[PlayerRecord]) -> None:
+    """Validate and upsert one batch of records in a single transaction."""
+
+    validate_player_records(players)
+    if not players:
+        return
+    cursor = conn.cursor()
+    cursor.executemany(upsert_sql(dialect_for(conn)), [player_to_row(p) for p in players])
     conn.commit()
