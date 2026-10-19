@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from bs4 import BeautifulSoup
 
@@ -334,3 +336,55 @@ def test_parse_player_rows_from_text_stops_on_invalid_standard_record(
     ]
 
     assert parse_player_rows_from_text(lines, scrape_timestamp) == []
+
+
+LIVE_FIXTURE = Path(__file__).parent / "fixtures" / "ktc_rankings_page_2026-10-19.html"
+
+
+def test_parse_player_rows_handles_live_layout_snapshot() -> None:
+    """Golden-file check against real KeepTradeCut markup captured on 2026-10-19."""
+
+    timestamp = "2026-10-19T19:12:16+00:00"
+    records = parse_player_rows(LIVE_FIXTURE.read_text(), timestamp)
+
+    assert records == [
+        PlayerRecord(
+            "2026-10-19",
+            "Jahmyr Gibbs",
+            "RB",
+            1,
+            1,
+            "DET",
+            "keeptradecut",
+            24.6,
+            1,
+            9999.0,
+            timestamp,
+        ),
+        PlayerRecord(
+            "2026-10-19",
+            "Bijan Robinson",
+            "RB",
+            2,
+            2,
+            "ATL",
+            "keeptradecut",
+            24.7,
+            1,
+            9998.0,
+            timestamp,
+        ),
+        PlayerRecord(
+            "2026-10-19",
+            "2027 Early 1st",
+            "PICK",
+            None,
+            None,
+            None,
+            "keeptradecut",
+            None,
+            3,
+            6871.0,
+            timestamp,
+        ),
+    ]

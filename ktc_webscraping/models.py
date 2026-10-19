@@ -40,3 +40,4 @@ class ScrapeConfig:
     row_count_tolerance: int = 10
     page_delay_seconds: float = 3.0
     row_count_poll_timeout: int = 15
+    database_url: str | None = None

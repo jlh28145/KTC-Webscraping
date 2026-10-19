@@ -1,10 +1,15 @@
 from pathlib import Path
 
 import pytest
-from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.common.exceptions import (
+    NoSuchElementException,
+    TimeoutException,
+    WebDriverException,
+)
 
 from ktc_webscraping import extract
 from ktc_webscraping.models import PlayerRecord, ScrapeConfig
+from ktc_webscraping.transform import extract_rankings_text_lines
 
 
 class _FakeDriver:
@@ -280,3 +285,159 @@ def test_scrape_rankings_uses_one_utc_timestamp_for_every_page(monkeypatch, tmp_
 
     assert len(set(observed_timestamps)) == 1
     assert observed_timestamps[0].endswith("+00:00")
+
+
+class _FakeElement:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+
+class _PageDriver:
+    """Driver stand-in for extract_page_records: serves fixed HTML and live-DOM text."""
+
+    def __init__(self, page_source: str, row_texts=(), container_text: str | None = None):
+        self.page_source = page_source
+        self.row_texts = list(row_texts)
+        self.container_text = container_text
+        self.title = "Dynasty Rankings - KeepTradeCut"
+        self.current_url = "https://keeptradecut.com/dynasty-rankings?page=0"
+        self.visited: list[str] = []
+
+    def get(self, url: str) -> None:
+        self.visited.append(url)
+
+    def find_elements(self, by, value):
+        return [_FakeElement(text) for text in self.row_texts]
+
+    def find_element(self, by, value):
+        if self.container_text is None:
+            raise NoSuchElementException("no container")
+        return _FakeElement(self.container_text)
+
+
+def _extract_from(driver: _PageDriver, monkeypatch) -> list[PlayerRecord]:
+    monkeypatch.setattr(extract, "wait_for_rankings", lambda *args: None)
+    return extract.extract_page_records(
+        driver=driver,
+        wait=object(),
+        page_number=2,
+        base_url="https://example.com?page={page}",
+        min_rows_per_page=1,
+        scrape_timestamp="2026-03-21T00:00:00+00:00",
+    )
+
+
+def test_extract_page_records_parses_page_html(monkeypatch, legacy_row_html: str) -> None:
+    driver = _PageDriver(legacy_row_html)
+
+    records = _extract_from(driver, monkeypatch)
+
+    assert driver.visited == ["https://example.com?page=2"]
+    assert [record.player_name for record in records] == ["Josh Allen"]
+
+
+def test_extract_page_records_falls_back_to_live_row_text(monkeypatch) -> None:
+    driver = _PageDriver(
+        "<html></html>",
+        row_texts=["1\nBijan RobinsonATL\nRB1\n24.1 y.o.\nTier 1\n1\n9999", "   "],
+    )
+
+    records = _extract_from(driver, monkeypatch)
+
+    assert [(record.player_name, record.team) for record in records] == [("Bijan Robinson", "ATL")]
+
+
+def test_extract_page_records_falls_back_to_container_text(
+    monkeypatch, text_layout_html: str
+) -> None:
+    container_text = extract_rankings_text_lines(text_layout_html)
+    driver = _PageDriver("<html></html>", container_text="\n".join(container_text))
+
+    records = _extract_from(driver, monkeypatch)
+
+    assert [record.player_name for record in records] == ["Bijan Robinson", "2027 Early 1st"]
+
+
+def test_extract_page_records_raises_with_diagnostics_when_nothing_parses(monkeypatch) -> None:
+    driver = _PageDriver("<html>Just a moment...</html>")
+
+    with pytest.raises(RuntimeError, match="parsed 0 ranking rows.*block_marker='just a moment'"):
+        _extract_from(driver, monkeypatch)
+
+
+class _ChromeRecorder:
+    """Records how build_driver constructs Chrome, failing the first attempt if asked."""
+
+    def __init__(self, fail_first: bool) -> None:
+        self.fail_first = fail_first
+        self.calls: list[dict] = []
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.fail_first and len(self.calls) == 1:
+            raise WebDriverException("chromedriver not on PATH")
+        return object()
+
+
+def test_build_driver_configures_headless_chrome(monkeypatch) -> None:
+    chrome = _ChromeRecorder(fail_first=False)
+    monkeypatch.setattr(extract.webdriver, "Chrome", chrome)
+    monkeypatch.setenv("GOOGLE_CHROME_BIN", "/opt/chrome/chrome")
+
+    driver, wait = extract.build_driver(headless=True)
+
+    options = chrome.calls[0]["options"]
+    assert "--headless=new" in options.arguments
+    assert options.binary_location == "/opt/chrome/chrome"
+    assert wait._timeout == 60
+    assert wait._driver is driver
+
+
+def test_build_driver_falls_back_to_webdriver_manager(monkeypatch) -> None:
+    chrome = _ChromeRecorder(fail_first=True)
+    monkeypatch.setattr(extract.webdriver, "Chrome", chrome)
+    monkeypatch.setattr(extract, "Service", lambda path: f"service:{path}")
+    monkeypatch.setattr(
+        extract, "ChromeDriverManager", lambda: type("M", (), {"install": lambda self: "/drv"})()
+    )
+    monkeypatch.delenv("GOOGLE_CHROME_BIN", raising=False)
+
+    extract.build_driver(headless=False)
+
+    assert len(chrome.calls) == 2
+    assert chrome.calls[1]["service"] == "service:/drv"
+    assert "--headless=new" not in chrome.calls[1]["options"].arguments
+
+
+class _PopupWait:
+    def __init__(self, popup) -> None:
+        self.popup = popup
+
+    def until(self, condition):
+        if self.popup is None:
+            raise TimeoutException("no modal")
+        return self.popup
+
+
+def test_close_popup_clicks_dismiss_button(monkeypatch) -> None:
+    clicked = []
+
+    class Popup:
+        def find_element(self, by, value):
+            return f"button#{value}"
+
+    class Driver:
+        def execute_script(self, script, element):
+            clicked.append(element)
+
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _PopupWait(Popup()))
+
+    extract.close_popup(Driver())
+
+    assert clicked == ["button#dont-know"]
+
+
+def test_close_popup_ignores_missing_modal(monkeypatch) -> None:
+    monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _PopupWait(None))
+
+    assert extract.close_popup(object()) is None

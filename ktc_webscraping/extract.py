@@ -28,7 +28,6 @@ from .transform import (
 DEFAULT_BASE_URL = (
     "https://keeptradecut.com/dynasty-rankings?page={page}&filters=QB|WR|RB|TE|RDP&format=2"
 )
-DEFAULT_PAGE_COUNT = int(os.getenv("KTC_PAGE_COUNT", "10"))
 DEFAULT_MIN_ROWS_PER_PAGE = 50
 DEFAULT_ROW_COUNT_TOLERANCE = 10
 DEFAULT_ROW_COUNT_POLL_TIMEOUT = 15
