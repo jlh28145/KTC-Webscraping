@@ -1,5 +1,6 @@
 beautifulsoup4
 fastapi
+httpx2
 pandas
 pytest
 pytest-cov

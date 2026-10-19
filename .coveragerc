@@ -1,6 +1,7 @@
 [run]
 source =
     ktc_webscraping
+    app
 
 [report]
 show_missing = true
