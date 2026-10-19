@@ -33,10 +33,17 @@ def normalize_position(position_text: str) -> tuple[str, int | None]:
 
 
 def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
+    """Parse one ``.onePlayer`` row from either the legacy or the current layout.
+
+    The current layout (2026-10) moved tier into ``.player-info .position`` and
+    age into a second ``.position-team .position`` paragraph; the legacy layout
+    used dedicated ``.player-tier`` and ``.age`` nodes.
+    """
+
     rank_node = row.select_one(".rank-number")
     name_node = row.select_one(".player-name a")
     position_node = row.select_one(".position-team .position")
-    tier_node = row.select_one(".player-tier")
+    tier_node = row.select_one(".player-tier") or row.select_one(".player-info .position")
     value_node = row.select_one(".value")
 
     if not all([rank_node, name_node, position_node, tier_node, value_node]):
@@ -51,8 +58,7 @@ def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
         team_node = row.select_one(".player-team")
         team = team_node.get_text(strip=True) if team_node else None
 
-        age_node = row.select_one(".age")
-        age_text = age_node.get_text(strip=True) if age_node else None
+        age_text = _find_age_text(row)
         if age_text:
             age = safe_float(age_text.replace(" y.o.", ""))
 
@@ -69,6 +75,17 @@ def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
         value=safe_float(value_node.get_text(strip=True)),
         scraped_at=scrape_timestamp,
     )
+
+
+def _find_age_text(row) -> str | None:
+    age_node = row.select_one(".age")
+    if age_node:
+        return age_node.get_text(strip=True)
+    for node in row.select(".position-team .position"):
+        text = node.get_text(strip=True)
+        if text.endswith("y.o."):
+            return text
+    return None
 
 
 def parse_player_text_lines(lines: list[str], scrape_timestamp: str) -> PlayerRecord | None:
