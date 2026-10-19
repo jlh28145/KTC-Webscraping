@@ -41,6 +41,15 @@ jobs:
       - name: Prepare artifact directory
         run: mkdir -p artifacts
 
+      # Each run saves its DB under a unique key; restore-keys picks up the most
+      # recent one so ktc_rankings accumulates history across scheduled runs.
+      - name: Restore historical database
+        uses: actions/cache@v4
+        with:
+          path: artifacts/ktc.db
+          key: ktc-db-${{ github.run_id }}
+          restore-keys: ktc-db-
+
       - name: Run scheduled scrape
         env:
           PAGE_COUNT: ${{ github.event.inputs.page_count || '10' }}
@@ -61,6 +70,9 @@ jobs:
           db_path = Path("artifacts/ktc.db")
           conn = sqlite3.connect(db_path)
           total_rows = conn.execute("SELECT COUNT(*) FROM ktc_rankings").fetchone()[0]
+          scrape_dates = conn.execute(
+              "SELECT COUNT(DISTINCT scrape_date) FROM ktc_rankings"
+          ).fetchone()[0]
           latest_scrape_date = conn.execute(
               "SELECT MAX(scrape_date) FROM ktc_rankings"
           ).fetchone()[0]
@@ -83,6 +95,7 @@ jobs:
           lines = [
               f"Database path: {db_path}",
               f"Total rows in artifact DB: {total_rows}",
+              f"Distinct scrape dates in history: {scrape_dates}",
               f"Latest scrape date: {latest_scrape_date}",
               f"Rows for latest scrape date: {latest_scrape_rows}",
               "",
@@ -94,7 +107,7 @@ jobs:
               )
 
           summary_text = "\n".join(lines)
-          Path("artifacts/scrape_summary.txt").write_text(summary_text, encoding="ascii")
+          Path("artifacts/scrape_summary.txt").write_text(summary_text, encoding="utf-8")
           print(summary_text)
           PY
 

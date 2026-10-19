@@ -139,7 +139,8 @@ def insert_player_data(conn: sqlite3.Connection, players: list[PlayerRecord]) ->
             team = excluded.team,
             age = excluded.age,
             tier = excluded.tier,
-            value = excluded.value
+            value = excluded.value,
+            scraped_at = excluded.scraped_at
         """,
         [player_to_row(player) for player in players],
     )

@@ -1,3 +1,4 @@
+import pytest
 from bs4 import BeautifulSoup
 
 from ktc_webscraping.models import PlayerRecord
@@ -32,6 +33,19 @@ def test_split_name_and_team_handles_suffix_team_codes() -> None:
     assert split_name_and_team("Bijan RobinsonATL") == ("Bijan Robinson", "ATL")
     assert split_name_and_team("2027 Early 1stFA") == ("2027 Early 1st", "FA")
     assert split_name_and_team("Unmatched Name") == ("Unmatched Name", None)
+
+
+@pytest.mark.parametrize(
+    ("player_line", "expected"),
+    [
+        ("Kenneth Walker IIIKCC", ("Kenneth Walker III", "KCC")),
+        ("Kenneth Walker IIIFA", ("Kenneth Walker III", "FA")),
+        ("Ollie Gordon IIR FA", ("Ollie Gordon II", "R FA")),
+        ("Marvin Harrison Jr.ARI", ("Marvin Harrison Jr.", "ARI")),
+    ],
+)
+def test_split_name_and_team_handles_names_ending_in_capitals(player_line, expected) -> None:
+    assert split_name_and_team(player_line) == expected
 
 
 def test_parse_player_row_from_legacy_html(legacy_row_html: str, scrape_timestamp: str) -> None:

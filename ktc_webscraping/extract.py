@@ -1,7 +1,7 @@
 import os
 import random
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from logging import getLogger
 
 from selenium import webdriver
@@ -245,7 +245,7 @@ def extract_page_records_with_retry(
     """Retry page extraction a bounded number of times before failing the run."""
 
     total_attempts = retry_attempts + 1
-    last_error: RuntimeError | None = None
+    last_error: RuntimeError | WebDriverException | None = None
 
     for attempt in range(1, total_attempts + 1):
         try:
@@ -259,7 +259,7 @@ def extract_page_records_with_retry(
                 row_count_tolerance=row_count_tolerance,
                 row_count_poll_timeout=row_count_poll_timeout,
             )
-        except RuntimeError as exc:
+        except (RuntimeError, WebDriverException) as exc:
             last_error = exc
             if attempt == total_attempts:
                 break
@@ -288,8 +288,12 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
     A single page that fails every retry is logged and skipped rather than
     discarding every other page already scraped in the same run; the run
     only fails outright if every page failed.
+
+    Every record in a run shares one UTC timestamp, so a run that crosses
+    midnight still lands under a single ``scrape_date``.
     """
 
+    scrape_timestamp = datetime.now(UTC).isoformat()
     driver, wait = build_driver(headless=headless)
     all_players: list[PlayerRecord] = []
     failed_pages: list[int] = []
@@ -297,7 +301,6 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
     try:
         for page in range(config.page_count):
             LOGGER.info("Scraping page %s of %s", page + 1, config.page_count)
-            scrape_timestamp = datetime.now().isoformat()
             try:
                 page_rows = extract_page_records_with_retry(
                     driver=driver,

@@ -338,14 +338,14 @@ def test_load_layer_upserts_existing_player_for_same_scrape_date(
         29.9,
         1,
         9995.0,
-        scrape_timestamp,
+        "2026-03-21T18:30:00",
     )
 
     insert_player_data(conn, [original])
     insert_player_data(conn, [updated])
     row = conn.execute(
         """
-        SELECT rank_overall, age, value
+        SELECT rank_overall, age, value, scraped_at
         FROM ktc_rankings
         WHERE scrape_date = ? AND player_name = ? AND source = ?
         """,
@@ -355,7 +355,7 @@ def test_load_layer_upserts_existing_player_for_same_scrape_date(
     conn.close()
 
     assert count == 1
-    assert row == (2, 29.9, 9995.0)
+    assert row == (2, 29.9, 9995.0, "2026-03-21T18:30:00")
 
 
 def test_load_layer_accumulates_historical_rows_across_scrape_dates(temp_db_path) -> None:
