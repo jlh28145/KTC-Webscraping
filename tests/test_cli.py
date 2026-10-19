@@ -1,4 +1,5 @@
 import runpy
+from importlib import metadata
 from pathlib import Path
 
 import pytest
@@ -368,3 +369,12 @@ def test_cli_module_main_block_raises_system_exit(monkeypatch) -> None:
         runpy.run_module("ktc_webscraping.cli", run_name="__main__")
 
     assert exc_info.value.code == 0
+
+
+def test_ktc_scrape_console_script_points_at_cli_main() -> None:
+    scripts = metadata.entry_points(group="console_scripts")
+    matches = [entry for entry in scripts if entry.name == "ktc-scrape"]
+    if not matches:
+        pytest.skip("ktc-webscraping is not installed; run `make install`")
+
+    assert matches[0].load() is cli.main

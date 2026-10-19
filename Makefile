@@ -1,4 +1,4 @@
-.PHONY: install lint format test scrape api dashboard ci
+.PHONY: install lock lint format test scrape api dashboard ci
 
 PYTHON ?= ./.venv/bin/python
 PAGE_COUNT ?= 10
@@ -9,6 +9,13 @@ API_PORT ?= 8000
 install:
 	$(PYTHON) -m pip install --upgrade pip
 	$(PYTHON) -m pip install -r requirements.txt
+	$(PYTHON) -m pip install --no-deps -e .
+
+# Regenerate the pinned lock file from pyproject.toml (requires uv). Releases from the last
+# 14 days are skipped so the lock never pins a version that is brand new or not yet mirrored.
+lock:
+	uv pip compile pyproject.toml --extra dev --python-version 3.12 --exclude-newer "14 days" \
+		--quiet --custom-compile-command "make lock" -o requirements.txt
 
 lint:
 	$(PYTHON) -m ruff check .

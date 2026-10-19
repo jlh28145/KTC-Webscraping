@@ -37,6 +37,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install --no-deps -e .
 
       - name: Prepare artifact directory
         run: mkdir -p artifacts
@@ -57,7 +58,7 @@ jobs:
           KTC_DB_PATH: artifacts/ktc.db
         run: |
           echo "Starting scheduled scrape with PAGE_COUNT=${PAGE_COUNT}"
-          python -m ktc_webscraping.cli --page-count "${PAGE_COUNT}" --db-path "${KTC_DB_PATH}"
+          ktc-scrape --page-count "${PAGE_COUNT}" --db-path "${KTC_DB_PATH}"
 
       - name: Build scrape summary
         env:

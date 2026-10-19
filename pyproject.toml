@@ -1,3 +1,43 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ktc-webscraping"
+version = "1.0.0"
+description = "Tested ETL pipeline that snapshots KeepTradeCut dynasty rankings into SQLite."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Juvarne Hinson" }]
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "selenium>=4.20",
+    "webdriver-manager>=4.0",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+dashboard = [
+    "requests>=2.32",
+    "streamlit>=1.40",
+]
+dev = [
+    "ktc-webscraping[api,dashboard]",
+    "httpx2>=2.0",
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+ktc-scrape = "ktc_webscraping.cli:main"
+
+[tool.setuptools]
+packages = ["ktc_webscraping"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
