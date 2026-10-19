@@ -91,7 +91,6 @@ Supporting application surfaces already in the repo:
 
 - [app/main.py](/home/vhinson/dev/KTC-Webscraping/app/main.py): FastAPI read API over the SQLite data
 - [dashboard/dashboard.py](/home/vhinson/dev/KTC-Webscraping/dashboard/dashboard.py): Streamlit dashboard prototype
-- [src/scraper.py](/home/vhinson/dev/KTC-Webscraping/src/scraper.py): compatibility shim to the package CLI
 
 ## ETL Flow
 
@@ -156,12 +155,6 @@ Run with a visible browser:
 
 ```bash
 ./.venv/bin/python -m ktc_webscraping.cli scrape --page-count 10 --headed
-```
-
-Backwards-compatible legacy entrypoint:
-
-```bash
-./.venv/bin/python -m src.scraper --page-count 10
 ```
 
 The scraper writes to:
@@ -255,7 +248,8 @@ Current local test coverage includes:
 - transform parsing behavior across legacy and current ranking layouts
 - SQLite schema creation, inserts, duplicate prevention, and upsert behavior
 - CLI argument parsing and config wiring
-- import safety for the package and legacy compatibility shim
+- import safety for the package
+- a golden-file parse of real KeepTradeCut markup captured in `tests/fixtures/`
 - regression protection for live-layout parsing edge cases
 
 Current test command:
@@ -351,7 +345,6 @@ This matters for the remote QA / SDET story because it shows the repo handles bo
 │   ├── load.py
 │   ├── models.py
 │   └── transform.py
-├── src/
 ├── requirements.txt
 └── todo.md
 ```
@@ -359,7 +352,7 @@ This matters for the remote QA / SDET story because it shows the repo handles bo
 ## Local Data Handling
 
 - `db/ktc.db` is local runtime state and should not be committed
-- representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json) and [ktc_rankings_sample.csv](/home/vhinson/dev/KTC-Webscraping/data/samples/ktc_rankings_sample.csv)
+- representative fixture/sample data belongs in the repo, such as [players_sample.json](/home/vhinson/dev/KTC-Webscraping/data/samples/players_sample.json)
 - repeated scrape runs on different dates accumulate historical rows in `ktc_rankings`
 - duplicate prevention and upsert behavior apply within the same `scrape_date` and `source`
 - legacy `players` tables are automatically retired when the current load layer initializes the database

@@ -1,14 +1,12 @@
 import argparse
-import os
 import sys
 from logging import getLogger
 from pathlib import Path
 
-from .config import load_runtime_config
+from .config import RuntimeConfig, load_runtime_config
 from .extract import (
     DEFAULT_BASE_URL,
     DEFAULT_MIN_ROWS_PER_PAGE,
-    DEFAULT_PAGE_COUNT,
     DEFAULT_PAGE_DELAY_SECONDS,
     DEFAULT_ROW_COUNT_POLL_TIMEOUT,
     DEFAULT_ROW_COUNT_TOLERANCE,
@@ -18,9 +16,6 @@ from .load import build_database_config, create_connection, insert_player_data
 from .logging_config import configure_logging
 from .models import ScrapeConfig
 
-DEFAULT_RUNTIME_CONFIG = load_runtime_config()
-DEFAULT_DB_PATH = DEFAULT_RUNTIME_CONFIG.db_path
-DEFAULT_DATABASE_URL = DEFAULT_RUNTIME_CONFIG.database_url
 LOGGER = getLogger(__name__)
 
 
@@ -63,11 +58,18 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         row_count_tolerance=args.row_count_tolerance,
         page_delay_seconds=args.page_delay_seconds,
         row_count_poll_timeout=args.row_count_poll_timeout,
+        database_url=args.database_url or None,
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI parser used by local runs and automation."""
+def build_parser(runtime_config: RuntimeConfig | None = None) -> argparse.ArgumentParser:
+    """Build the CLI parser used by local runs and automation.
+
+    Option defaults come from ``runtime_config`` (the environment, by default),
+    so ``KTC_*`` variables set defaults and explicit flags override them.
+    """
+
+    runtime_config = runtime_config or load_runtime_config()
 
     parser = argparse.ArgumentParser(
         description=(
@@ -81,29 +83,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the rankings scraper and persist results.",
         description="Scrape KeepTradeCut rankings and store the normalized records.",
     )
-    _add_scrape_arguments(scrape_parser)
+    _add_scrape_arguments(scrape_parser, runtime_config)
     return parser
 
 
-def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_scrape_arguments(parser: argparse.ArgumentParser, runtime_config: RuntimeConfig) -> None:
     """Register arguments shared by the scraper entrypoint."""
 
     parser.add_argument(
         "--page-count",
         type=positive_int,
-        default=DEFAULT_PAGE_COUNT,
+        default=runtime_config.page_count,
         help="Number of ranking pages to scrape.",
     )
     parser.add_argument(
         "--db-path",
         type=Path,
-        default=DEFAULT_DB_PATH,
-        help="SQLite database destination.",
+        default=runtime_config.db_path,
+        help="SQLite database destination. Ignored when a database URL is set.",
     )
     parser.add_argument(
         "--database-url",
-        default=DEFAULT_DATABASE_URL,
-        help="Database URL. Supports sqlite:///... now and prepares for hosted Postgres later.",
+        default=runtime_config.database_url,
+        help=(
+            "Database URL (defaults to KTC_DATABASE_URL). Takes precedence over --db-path. "
+            "Supports sqlite:///... now and prepares for hosted Postgres later."
+        ),
     )
     parser.add_argument(
         "--base-url",
@@ -118,8 +123,8 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--retry-attempts",
-        type=positive_int,
-        default=2,
+        type=non_negative_int,
+        default=runtime_config.retry_attempts,
         help="Number of retry attempts for a page after the initial failure.",
     )
     parser.add_argument(
@@ -162,8 +167,9 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser) -> None:
 def run(config: ScrapeConfig, headed: bool = False) -> int:
     """Execute a scrape run and persist the normalized results."""
 
-    database_url = os.getenv("KTC_DATABASE_URL")
-    database_config = build_database_config(db_path=config.db_path, database_url=database_url)
+    database_config = build_database_config(
+        db_path=config.db_path, database_url=config.database_url
+    )
     LOGGER.info("Starting scrape run with database %s", database_config.url)
     conn = create_connection(config.db_path, database_url=database_config.url)
     try:
@@ -180,7 +186,13 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     configure_logging()
-    parser = build_parser()
+    try:
+        runtime_config = load_runtime_config()
+    except ValueError as exc:
+        print(f"Configuration error: {exc}", file=sys.stderr)
+        return 2
+
+    parser = build_parser(runtime_config)
     raw_argv = argv if argv is not None else sys.argv[1:]
     normalized_argv = raw_argv
     if not raw_argv or raw_argv[0] not in {"scrape", "-h", "--help"}:
@@ -190,9 +202,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.command != "scrape":
         parser.print_help()
         return 0
-
-    if args.database_url:
-        os.environ["KTC_DATABASE_URL"] = args.database_url
 
     try:
         config = build_config(args)

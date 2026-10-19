@@ -2,8 +2,5 @@
 source =
     ktc_webscraping
 
-omit =
-    ktc_webscraping/extract.py
-
 [report]
 show_missing = true
