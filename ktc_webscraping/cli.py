@@ -72,9 +72,7 @@ def build_parser(runtime_config: RuntimeConfig | None = None) -> argparse.Argume
     runtime_config = runtime_config or load_runtime_config()
 
     parser = argparse.ArgumentParser(
-        description=(
-            "Scrape KeepTradeCut rankings into a local SQLite database or a future hosted database."
-        )
+        description=("Scrape KeepTradeCut rankings into a local SQLite database or Postgres.")
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -107,7 +105,7 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser, runtime_config: Runti
         default=runtime_config.database_url,
         help=(
             "Database URL (defaults to KTC_DATABASE_URL). Takes precedence over --db-path. "
-            "Supports sqlite:///... now and prepares for hosted Postgres later."
+            "Supports sqlite:///path and postgresql://user:pass@host/db."
         ),
     )
     parser.add_argument(
@@ -170,7 +168,7 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
     database_config = build_database_config(
         db_path=config.db_path, database_url=config.database_url
     )
-    LOGGER.info("Starting scrape run with database %s", database_config.url)
+    LOGGER.info("Starting scrape run with database %s", database_config.display_url)
     conn = create_connection(config.db_path, database_url=database_config.url)
     try:
         players = scrape_rankings(config=config, headless=not headed)
@@ -180,7 +178,7 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
 
     LOGGER.info("Stored %s records", len(players))
     print(f"Scraped and stored {len(players)} records using {database_config.scheme}.")
-    print(f"Destination: {database_config.url}")
+    print(f"Destination: {database_config.display_url}")
     return 0
 
 
@@ -208,8 +206,6 @@ def main(argv: list[str] | None = None) -> int:
         return run(config=config, headed=args.headed)
     except ValueError as exc:
         parser.exit(2, f"Configuration error: {exc}\n")
-    except NotImplementedError as exc:
-        parser.exit(2, f"{exc}\n")
     except Exception as exc:
         LOGGER.exception("Scrape failed")
         print(f"Scrape failed: {exc}", file=sys.stderr)

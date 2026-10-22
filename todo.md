@@ -14,7 +14,8 @@ As of 2026-10-19:
 - Phases 0–5 and 7–9 are complete; the finish-up phases (11–15, below) are complete or in review
 - 114 deterministic tests, 98% coverage over every module (including Selenium extract), 90% gate in CI
 - The daily scheduled scrape is green (500 rankings per run) and now accumulates history through the Actions cache
-- Next: Phase 6 hosted Postgres, then Phase 10 resume and interview material
+- Postgres load path is built and integration-tested in CI; the scheduled scrape intentionally stays on SQLite for now
+- Next: Phase 10 resume and interview material
 
 ---
 
@@ -198,9 +199,9 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 
 ---
 
-## Phase 6 - Prepare for Hosted Database Upgrade (Deferred)
+## Phase 6 - Prepare for Hosted Database Upgrade
 
-Status: deferred until we decide to resume cloud services and external database connections.
+Status (2026-10-19): the Postgres load path is complete and tested in CI against a `postgres:17` service container. Decision: the scheduled scrape stays on SQLite for now, so the GitHub secret and hosted Neon validation remain open.
 
 - [X] Evaluate Neon vs Supabase for hosted Postgres
 - [X] Choose one provider
@@ -291,7 +292,8 @@ Status: deferred until we decide to resume cloud services and external database 
 - [X] Phase 12: HTML parser supports KeepTradeCut's current layout, guarded by a golden-file fixture of real markup; config loaded when the CLI runs; dead files removed; `extract.py` counted in coverage (PR #11)
 - [X] Phase 13: API reads shared config, opens the DB read-only, returns proper 404/503 status codes, defaults to the latest snapshot; 24 `TestClient` tests (PR #12)
 - [X] Phase 14: `pyproject.toml` package with `ktc-scrape` entry point and extras; `uv`-generated lock with a 14-day release cooldown (PR #13)
-- [X] Phase 15: README rewritten for hiring-manager readers with relative links and an architecture diagram
+- [X] Phase 15: README rewritten for hiring-manager readers with relative links and an architecture diagram (PR #14)
+- [X] Phase 16: Postgres load path with SQLite/Postgres dialects, `postgres` extra, 7 integration tests against a CI service container that fail loudly if it's missing
 
 ---
 
@@ -335,7 +337,7 @@ Status: deferred until we decide to resume cloud services and external database 
 - [X] 4. Add load tests with SQLite
 - [X] 5. Add CI workflow
 - [X] 6. Add scheduled automation
-- [ ] 7. Upgrade to hosted Postgres
+- [ ] 7. Upgrade to hosted Postgres (load path done and tested; scheduled scrape stays on SQLite for now)
 - [X] 8. Polish README (interview story remains in Phase 10)
 
 ---

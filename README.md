@@ -6,17 +6,18 @@
 [![Lint: Ruff](https://img.shields.io/badge/lint-ruff-blue)](pyproject.toml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue)](.python-version)
 
-A tested ETL pipeline that takes a daily snapshot of [KeepTradeCut](https://keeptradecut.com) dynasty fantasy-football rankings. Each run stores the rankings as history in SQLite and serves them through a read-only API.
+A tested ETL pipeline that takes a daily snapshot of [KeepTradeCut](https://keeptradecut.com) dynasty fantasy-football rankings. Each run stores the rankings as history in SQLite or Postgres and serves them through a read-only API.
 
 The scraper is the easy part. This repo is a quality-engineering project. It shows how to make an automation that depends on a live, changing website **testable, deterministic in CI, and dependable on a schedule**.
 
 ## What this project demonstrates
 
 - **Layered design that can be tested.** Extract, transform and load are separate modules. Parsing is pure and runs without a browser, and Selenium sits behind a narrow interface that tests replace with fakes.
-- **Deterministic tests over brittle end-to-end ones.** 114 tests run in about 2 seconds without network access or a browser. That includes a golden-file test against real KeepTradeCut markup, so a site redesign fails CI instead of quietly lowering data quality.
+- **Deterministic tests over brittle end-to-end ones.** 124 tests run in about 2 seconds without network access or a browser (7 of them against a throwaway Postgres container). That includes a golden-file test against real KeepTradeCut markup, so a site redesign fails CI instead of quietly lowering data quality.
 - **CI as a quality gate.** Every push and pull request runs Ruff lint, a format check, and the tests with a 90% coverage floor that counts every module, plus a smoke test of the installed command.
 - **Unattended scheduled runs.** A daily GitHub Actions job scrapes about 500 rankings, carries the database forward between runs to build history, and publishes the database and a run summary as artifacts.
 - **Resilience learned from production.** Retries, pacing and per-page failure isolation were each added in response to observed live-site behavior, and each one has a regression test (see [Reliability design](#reliability-design)).
+- **Portable persistence.** One schema and one idempotent upsert run on SQLite locally and on Postgres. The Postgres path is integration-tested in CI against a real `postgres:17` service container.
 - **Reproducible environments.** Dependencies are declared in `pyproject.toml` and locked with `uv`, skipping releases newer than 14 days.
 
 ## Architecture
@@ -35,7 +36,7 @@ flowchart TB
     E --> P
     P --> R([PlayerRecord])
     T --> R
-    R --> L --> DB[(SQLite<br/>ktc_rankings)]
+    R --> L --> DB[(SQLite or Postgres<br/>ktc_rankings)]
     DB --> API[FastAPI<br/>app/main.py] --> D[Streamlit<br/>dashboard]
     CLI[ktc-scrape CLI] --> Extract
 ```
@@ -46,7 +47,7 @@ flowchart TB
 | [`ktc_webscraping/config.py`](ktc_webscraping/config.py) | `KTC_*` environment defaults, read when the CLI runs (never at import) |
 | [`ktc_webscraping/extract.py`](ktc_webscraping/extract.py) | Browser control, waits, retries, pacing, block-page detection |
 | [`ktc_webscraping/transform.py`](ktc_webscraping/transform.py) | Pure parsing of ranking rows into typed `PlayerRecord`s |
-| [`ktc_webscraping/load.py`](ktc_webscraping/load.py) | Schema creation, record validation, idempotent upserts |
+| [`ktc_webscraping/load.py`](ktc_webscraping/load.py) | Schema creation, record validation, idempotent upserts (SQLite and Postgres dialects) |
 | [`ktc_webscraping/models.py`](ktc_webscraping/models.py) | Frozen dataclasses shared across layers |
 | [`app/main.py`](app/main.py) | Read-only FastAPI service over the stored snapshots |
 | [`dashboard/dashboard.py`](dashboard/dashboard.py) | Streamlit demo UI on top of the API |
@@ -85,7 +86,8 @@ The live website is the least dependable part of the system, so it's the one thi
 | --- | ---: | --- |
 | Transform | 25 | Pure-function tests on HTML and text fixtures, including a **golden-file snapshot of real KeepTradeCut markup** ([`tests/fixtures/`](tests/fixtures/)), malformed rows, draft picks, and names like `Kenneth Walker III` |
 | Extract | 20 | Selenium replaced by small fake drivers and waits: retry exhaustion, Selenium timeouts, short-page tolerance, block-page detection, every parsing fallback, driver setup |
-| Load | 19 | Real SQLite in `tmp_path`: schema, unique index, upserts, history across dates, validation failures |
+| Load (SQLite) | 22 | Real SQLite in `tmp_path`: schema, unique index, upserts, history across dates, validation failures, per-dialect SQL |
+| Load (Postgres) | 7 | Real `postgres:17` service container in CI: schema parity, type round-trips, upserts, history, CLI end-to-end. Skipped locally unless `KTC_TEST_POSTGRES_URL` is set, and a **hard failure** in CI if the URL is missing, so the tests can't silently skip |
 | API | 24 | FastAPI `TestClient` against a seeded two-snapshot database: filters, pagination, input validation, and 404/422/501/503 paths |
 | CLI and config | 26 | Argument parsing, environment defaults, exit codes, and the installed `ktc-scrape` entry point |
 
@@ -93,7 +95,7 @@ Coverage is enforced at 90% over **every** module, including the Selenium layer 
 
 ## CI/CD and scheduled automation
 
-**[`ci.yml`](.github/workflows/ci.yml)** runs on every push and pull request: install from the lock, Ruff lint, format check, pytest with the coverage gate, then a smoke test of `ktc-scrape --help`. All of it runs in about 35 seconds.
+**[`ci.yml`](.github/workflows/ci.yml)** runs on every push and pull request with a Postgres 17 service container: install from the lock, Ruff lint, format check, pytest (SQLite and Postgres) with the coverage gate, then a smoke test of `ktc-scrape --help`. All of it runs in about 35 seconds.
 
 **[`scrape.yml`](.github/workflows/scrape.yml)** runs daily (13:00 UTC) or on manual dispatch:
 
@@ -124,17 +126,19 @@ Environment variables (see [`.env.example`](.env.example)) set the defaults, and
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `KTC_DB_PATH` | `db/ktc.db` | SQLite file for the scraper and the API |
-| `KTC_DATABASE_URL` | unset | `sqlite:///…` URL; takes precedence over `KTC_DB_PATH` |
+| `KTC_DATABASE_URL` | unset | `sqlite:///…` or `postgresql://…`; takes precedence over `KTC_DB_PATH` |
 | `KTC_PAGE_COUNT` | `10` | Pages to scrape (50 rankings each) |
 | `KTC_RETRY_ATTEMPTS` | `2` | Retries per page after the first failure |
 | `KTC_LOG_LEVEL` | `INFO` | Log verbosity |
 | `KTC_API_URL` | `http://localhost:8000` | API address used by the dashboard |
 
+To load into Postgres instead of SQLite, run `ktc-scrape --database-url postgresql://user:pass@host/db`.
+
 Run `ktc-scrape --help` for the tuning flags (`--row-count-tolerance`, `--row-count-poll-timeout`, `--page-delay-seconds`, `--headed`, …).
 
 ## Data model
 
-Each run writes one snapshot to `ktc_rankings`. A unique index on `(scrape_date, player_name, source)` makes re-running the same day idempotent (an upsert), while different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
+Each run writes one snapshot to `ktc_rankings`, with the same columns on SQLite and Postgres. A unique index on `(scrape_date, player_name, source)` makes re-running the same day idempotent (an upsert), while different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
 
 | Column | Notes |
 | --- | --- |
@@ -157,7 +161,7 @@ A sample in the current schema is in [`data/samples/players_sample.json`](data/s
 | `GET /scrape-dates` | Stored snapshot dates |
 | `GET /health` | Liveness check that doesn't need a database |
 
-The API opens the database read-only and returns 503 with a clear message if no scrape has been stored yet.
+The API opens the database read-only and returns 503 with a clear message if no scrape has been stored yet. It reads from SQLite. A Postgres URL returns 501 until the API gets its own Postgres path.
 
 ## Repository layout
 
@@ -174,5 +178,6 @@ requirements.txt    pinned lock generated by `make lock`
 
 ## Roadmap
 
-- **Hosted Postgres.** Add a Postgres load path (Neon) behind the existing `KTC_DATABASE_URL` setting, tested in CI against a Postgres service container, so history no longer depends on the Actions cache.
+- **Hosted Postgres for the scheduled scrape.** The Postgres load path is built and tested. Pointing the daily job at Neon only needs a `KTC_DATABASE_URL` repo secret, and then history no longer depends on the Actions cache. For now the scheduled scrape stays on SQLite.
+- **Postgres reads in the API**, so the API and dashboard can serve the hosted history.
 - Detailed phase-by-phase history and decisions are in [`todo.md`](todo.md).

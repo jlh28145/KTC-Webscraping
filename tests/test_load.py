@@ -1,12 +1,19 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
 
 from ktc_webscraping.load import (
+    POSTGRES,
+    RANKING_COLUMNS,
+    SQLITE,
     build_database_config,
     create_connection,
+    create_table_sql,
+    dialect_for,
     insert_player_data,
+    upsert_sql,
     validate_player_records,
 )
 from ktc_webscraping.models import PlayerRecord
@@ -55,12 +62,38 @@ def test_create_connection_creates_database_and_rankings_table(temp_db_path) -> 
     assert table_name == ("ktc_rankings",)
 
 
-def test_create_connection_raises_for_postgres_until_client_is_added(temp_db_path) -> None:
-    with pytest.raises(NotImplementedError):
+def test_create_connection_explains_missing_postgres_driver(monkeypatch, temp_db_path) -> None:
+    monkeypatch.setitem(sys.modules, "psycopg", None)
+
+    with pytest.raises(RuntimeError, match=r"pip install 'ktc-webscraping\[postgres\]'"):
         create_connection(
             temp_db_path,
             database_url="postgresql://user:password@localhost:5432/ktc_rankings",
         )
+
+
+@pytest.mark.parametrize(
+    ("dialect", "placeholder", "id_column", "float_type"),
+    [
+        (SQLITE, "?", "INTEGER PRIMARY KEY AUTOINCREMENT", "REAL"),
+        (POSTGRES, "%s", "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY", "DOUBLE PRECISION"),
+    ],
+)
+def test_dialects_render_backend_specific_sql(dialect, placeholder, id_column, float_type) -> None:
+    upsert = upsert_sql(dialect)
+
+    assert upsert.count(placeholder) == len(RANKING_COLUMNS)
+    assert "ON CONFLICT (scrape_date, player_name, source) DO UPDATE" in upsert
+    assert f"id {id_column}" in create_table_sql(dialect)
+    assert f"value {float_type}" in create_table_sql(dialect)
+
+
+def test_dialect_for_detects_sqlite_connections(temp_db_path) -> None:
+    conn = create_connection(temp_db_path)
+
+    assert dialect_for(conn) is SQLITE
+    assert dialect_for(object()) is POSTGRES
+    conn.close()
 
 
 def test_create_connection_creates_expected_rankings_schema(temp_db_path) -> None:
@@ -408,3 +441,18 @@ def test_load_layer_returns_sqlite_connection(temp_db_path) -> None:
         assert isinstance(conn, sqlite3.Connection)
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize(
+    ("database_url", "expected"),
+    [
+        (
+            "postgresql://ktc:s3cr%40t@ep-cool-name.neon.tech:5432/ktc?sslmode=require",
+            "postgresql://ktc:***@ep-cool-name.neon.tech:5432/ktc?sslmode=require",
+        ),
+        ("postgresql://ktc@localhost/ktc", "postgresql://ktc@localhost/ktc"),
+        ("sqlite:///db/ktc.db", "sqlite:///db/ktc.db"),
+    ],
+)
+def test_display_url_masks_passwords(database_url: str, expected: str) -> None:
+    assert build_database_config(database_url=database_url).display_url == expected

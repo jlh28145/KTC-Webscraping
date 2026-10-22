@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 
 @dataclass(frozen=True)
@@ -9,6 +10,19 @@ class DatabaseConfig:
     url: str
     scheme: str
     sqlite_path: Path | None
+
+    @property
+    def display_url(self) -> str:
+        """The URL with any password masked, safe for logs and console output."""
+
+        parts = urlsplit(self.url)
+        if parts.password is None:
+            return self.url
+        host = parts.hostname or ""
+        if parts.port:
+            host = f"{host}:{parts.port}"
+        netloc = f"{parts.username}:***@{host}"
+        return urlunsplit(parts._replace(netloc=netloc))
 
 
 @dataclass(frozen=True)
