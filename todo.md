@@ -15,7 +15,7 @@ As of 2026-10-19:
 - 114 deterministic tests, 98% coverage over every module (including Selenium extract), 90% gate in CI
 - The daily scheduled scrape is green (500 rankings per run) and now accumulates history through the Actions cache
 - Postgres load path is built and integration-tested in CI; the scheduled scrape intentionally stays on SQLite for now
-- Next: Phase 10 resume and interview material
+- Phase 10 is complete; the remaining open items are on hold by decision (hosted database) or personal (rehearsal)
 
 ---
 
@@ -187,9 +187,9 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 - [X] Make scheduled job run the CLI entrypoint
 - [X] Ensure scheduled job installs dependencies correctly
 - [X] Decide persistence path for automation:
-  - [ ] CSV commit-back approach
+  - ~~CSV commit-back approach~~ (not chosen: database-backed persistence instead)
 - [X] or database-backed persistence
-- [ ] Handle secrets securely if external services are used
+- [ ] Handle secrets securely if external services are used (on hold: no external services while the scheduled scrape stays on SQLite; database passwords are already masked in logs)
 - [X] Add basic logging / output visibility for scheduled runs
 - [X] Verify workflow can run without manual intervention
 
@@ -207,9 +207,9 @@ Status (2026-10-19): the Postgres load path is complete and tested in CI against
 - [X] Choose one provider
 - [X] Create hosted Postgres database
 - [X] Add environment variable support for connection settings
-- [ ] Store secrets in GitHub Secrets
+- [ ] Store secrets in GitHub Secrets (on hold: scheduled scrape stays on SQLite)
 - [X] Adapt `load.py` for Postgres compatibility
-- [ ] Validate inserts / upserts against hosted DB
+- [ ] Validate inserts / upserts against hosted DB (on hold; validated against a Postgres 17 service container in CI)
 - [X] Keep SQLite as the local dev option if practical
 - [X] Document local vs cloud configuration paths
 
@@ -300,28 +300,30 @@ Status (2026-10-19): the Postgres load path is complete and tested in CI against
 ## Phase 10 - Make It Resume and Interview Ready
 
 ### Resume translation
-- [ ] Write 3 to 5 resume bullets based on the finished repo
-- [ ] Focus bullets on architecture, validation, CI/CD, automation, and persistence
-- [ ] Quantify what you can honestly quantify
-- [ ] Keep wording aligned to remote QA / SDET roles
+- [X] Write 3 to 5 resume bullets based on the finished repo
+- [X] Focus bullets on architecture, validation, CI/CD, automation, and persistence
+- [X] Quantify what you can honestly quantify
+- [X] Keep wording aligned to remote QA / SDET roles
 
 ### Interview readiness
-- [ ] Prepare a 60-second project summary
-- [ ] Prepare a 2-minute technical walkthrough
-- [ ] Be ready to explain:
-  - [ ] Why ETL separation matters
-  - [ ] Why transform tests were prioritized
-  - [ ] Why Selenium was not the main CI test target
-  - [ ] Why SQLite came before hosted Postgres
-  - [ ] How GitHub Actions improved reliability
-  - [ ] How scheduling changes the system design
-- [ ] Be ready to discuss tradeoffs and future improvements
+- [X] Prepare a 60-second project summary
+- [X] Prepare a 2-minute technical walkthrough
+- [X] Be ready to explain:
+  - [X] Why ETL separation matters
+  - [X] Why transform tests were prioritized
+  - [X] Why Selenium was not the main CI test target
+  - [X] Why SQLite came before hosted Postgres
+  - [X] How GitHub Actions improved reliability
+  - [X] How scheduling changes the system design
+- [X] Be ready to discuss tradeoffs and future improvements
+
+Resume bullets, scripts, answers, and known limits live in a private prep doc, outside this public repo. Remaining: rehearse them aloud.
 
 ### Portfolio readiness
-- [ ] Pin the repo on GitHub if it becomes one of your best proof projects
-- [ ] Ensure commit history looks consistent
-- [ ] Make sure repo name and description are clean
-- [ ] Add topics/tags on GitHub if helpful
+- [X] Pin the repo on GitHub if it becomes one of your best proof projects
+- [X] Ensure commit history looks consistent (reviewed; early commits left as-is rather than rewriting public history)
+- [X] Make sure repo name and description are clean
+- [X] Add topics/tags on GitHub if helpful
 
 **Definition of done**
 - The repo supports your remote job narrative directly
@@ -359,9 +361,11 @@ Status (2026-10-19): the Postgres load path is complete and tested in CI against
 
 ## What This Repo Should Prove When Finished
 
-- [ ] You can design modular automation systems
-- [ ] You can write deterministic tests around meaningful logic
-- [ ] You understand CI/CD validation patterns
-- [ ] You can automate recurring execution
-- [ ] You can persist and manage structured data
-- [ ] You can present engineering work in a way remote employers actually care about
+Reviewed 2026-10-22 against the repo, CI, and GitHub.
+
+- [X] You can design modular automation systems: separate ETL layers, Selenium behind an interface tests can fake, one load path for SQLite and Postgres, `ktc-scrape` entry point
+- [X] You can write deterministic tests around meaningful logic: 127 tests in about 2.4 s with no network or browser, a golden-file test of real markup, 99% coverage with a 90% gate over every module
+- [X] You understand CI/CD validation patterns: lint, format, test, and coverage gates on every change; Postgres tests that fail rather than skip; locked dependencies. Caveat: CI plus scheduled operations, no deployment step
+- [X] You can automate recurring execution: daily scheduled scrape, 17 consecutive green runs (Oct 5–21, 2026), history carried forward between runs. Caveat: a partly degraded run still finishes green
+- [X] You can persist and manage structured data: unique key, idempotent upserts, history across dates, validation before load, same schema on two databases. Caveat: rows are keyed on player name rather than a player ID
+- [X] You can present engineering work in a way remote employers actually care about: README written for hiring managers, repo pinned with a current description and topics, private interview prep doc
