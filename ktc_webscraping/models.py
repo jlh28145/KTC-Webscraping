@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -42,6 +42,22 @@ class PlayerRecord:
     scraped_at: str
 
 
+# Which parser produced a page's records. Only HTML_PARSER is the primary path;
+# the others are fallbacks that kept old layouts working but can mask a redesign.
+HTML_PARSER = "html"
+FALLBACK_PARSERS = ("html-text", "dom-row-text", "dom-container-text")
+
+
+@dataclass(frozen=True)
+class ScrapeResult:
+    """What one scrape run produced, including how each page got parsed."""
+
+    records: list[PlayerRecord]
+    page_count: int
+    failed_pages: list[int] = field(default_factory=list)
+    fallback_pages: dict[int, str] = field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class ScrapeConfig:
     """Runtime settings for one scrape execution."""
@@ -55,3 +71,5 @@ class ScrapeConfig:
     page_delay_seconds: float = 3.0
     row_count_poll_timeout: int = 15
     database_url: str | None = None
+    min_row_ratio: float = 0.98
+    allow_degraded: bool = False

@@ -7,7 +7,7 @@ import pytest
 
 from ktc_webscraping import cli
 from ktc_webscraping.config import DEFAULT_DB_PATH, DEFAULT_PAGE_COUNT, DEFAULT_RETRY_ATTEMPTS
-from ktc_webscraping.models import PlayerRecord
+from ktc_webscraping.models import PlayerRecord, ScrapeResult
 
 
 @pytest.fixture(autouse=True)
@@ -161,7 +161,7 @@ def test_run_uses_load_and_extract_layers(monkeypatch, tmp_path: Path, capsys) -
     def fake_scrape_rankings(*, config, headless):
         observed["config"] = config
         observed["headless"] = headless
-        return players
+        return ScrapeResult(records=players, page_count=1)
 
     def fake_insert_player_data(conn, rows):
         observed["conn"] = conn
@@ -272,7 +272,11 @@ def test_run_prefers_database_url_over_db_path(monkeypatch, tmp_path: Path) -> N
         return DummyConnection()
 
     monkeypatch.setattr(cli, "create_connection", fake_create_connection)
-    monkeypatch.setattr(cli, "scrape_rankings", lambda *, config, headless: [])
+    monkeypatch.setattr(
+        cli,
+        "scrape_rankings",
+        lambda *, config, headless: ScrapeResult(records=[_player(1)], page_count=1),
+    )
     monkeypatch.setattr(cli, "insert_player_data", lambda conn, rows: None)
 
     assert cli.run(config=config) == 0
@@ -382,3 +386,92 @@ def test_ktc_scrape_console_script_points_at_cli_main() -> None:
         pytest.skip("ktc-webscraping is not installed; run `make install`")
 
     assert matches[0].load() is cli.main
+
+
+def _player(rank: int, name: str | None = None) -> PlayerRecord:
+    return PlayerRecord(
+        scrape_date="2026-10-25",
+        player_name=name or f"Player {rank}",
+        position="WR",
+        rank_overall=rank,
+        rank_position=rank,
+        team="KCC",
+        source="keeptradecut",
+        age=25.0,
+        tier=1,
+        value=9000.0 - rank,
+        scraped_at="2026-10-25T17:00:00+00:00",
+    )
+
+
+def _gate_config(tmp_path: Path, **overrides) -> cli.ScrapeConfig:
+    return cli.ScrapeConfig(
+        base_url="https://example.com?page={page}",
+        page_count=2,
+        min_rows_per_page=2,
+        retry_attempts=0,
+        db_path=tmp_path / "gate.db",
+        **overrides,
+    )
+
+
+def _run_with(monkeypatch, config, result):
+    stored = []
+    monkeypatch.setattr(cli, "scrape_rankings", lambda *, config, headless: result)
+    monkeypatch.setattr(cli, "insert_player_data", lambda conn, rows: stored.append(rows))
+    return cli.run(config=config), stored
+
+
+def test_run_rejects_a_degraded_scrape_and_stores_nothing(monkeypatch, tmp_path, capsys) -> None:
+    result = ScrapeResult(
+        records=[_player(1), _player(2)],
+        page_count=2,
+        failed_pages=[2],
+        fallback_pages={1: "dom-row-text"},
+    )
+
+    exit_code, stored = _run_with(monkeypatch, _gate_config(tmp_path), result)
+
+    err = capsys.readouterr().err
+    assert exit_code == cli.EXIT_QUALITY_FAILED == 3
+    assert stored == []
+    assert "Quality gate failed; nothing was stored" in err
+    assert "1 of 2 page(s) failed after retries: [2]" in err
+    assert "page 1 (dom-row-text)" in err
+    assert "Only 2 rows scraped; expected at least 4" in err
+
+
+def test_run_stores_a_clean_scrape(monkeypatch, tmp_path) -> None:
+    players = [_player(rank) for rank in range(1, 5)]
+
+    exit_code, stored = _run_with(
+        monkeypatch, _gate_config(tmp_path), ScrapeResult(records=players, page_count=2)
+    )
+
+    assert exit_code == 0
+    assert stored == [players]
+
+
+def test_allow_degraded_stores_despite_failed_checks(monkeypatch, tmp_path, caplog) -> None:
+    result = ScrapeResult(records=[_player(1)], page_count=2, failed_pages=[2])
+
+    exit_code, stored = _run_with(monkeypatch, _gate_config(tmp_path, allow_degraded=True), result)
+
+    assert exit_code == 0
+    assert stored == [[_player(1)]]
+    assert "Quality gate overridden by --allow-degraded" in caplog.text
+
+
+@pytest.mark.parametrize("value", ["0", "1.5", "-0.2"])
+def test_parser_rejects_out_of_range_min_row_ratio(value) -> None:
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["scrape", "--min-row-ratio", value])
+
+
+def test_quality_flags_reach_the_scrape_config() -> None:
+    args = cli.build_parser().parse_args(["scrape", "--min-row-ratio", "0.9", "--allow-degraded"])
+
+    config = cli.build_config(args)
+
+    assert config.min_row_ratio == 0.9
+    assert config.allow_degraded is True

@@ -13,7 +13,7 @@ import pytest
 
 from ktc_webscraping import cli
 from ktc_webscraping.load import create_connection, insert_player_data
-from ktc_webscraping.models import PlayerRecord, ScrapeConfig
+from ktc_webscraping.models import PlayerRecord, ScrapeConfig, ScrapeResult
 
 POSTGRES_URL = os.getenv("KTC_TEST_POSTGRES_URL")
 
@@ -171,7 +171,11 @@ def test_invalid_batch_writes_nothing(pg_conn) -> None:
 
 def test_cli_run_writes_to_postgres(pg_conn, monkeypatch, tmp_path: Path, capsys) -> None:
     players = [_record("2026-10-19", "Josh Allen", 1, 9999.0)]
-    monkeypatch.setattr(cli, "scrape_rankings", lambda *, config, headless: players)
+    monkeypatch.setattr(
+        cli,
+        "scrape_rankings",
+        lambda *, config, headless: ScrapeResult(records=players, page_count=1),
+    )
     config = ScrapeConfig(
         base_url="https://example.com?page={page}",
         page_count=1,

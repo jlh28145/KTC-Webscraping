@@ -15,8 +15,10 @@ from .extract import (
 from .load import build_database_config, create_connection, insert_player_data
 from .logging_config import configure_logging
 from .models import ScrapeConfig
+from .quality import DEFAULT_MIN_ROW_RATIO, check_scrape
 
 LOGGER = getLogger(__name__)
+EXIT_QUALITY_FAILED = 3
 
 
 def positive_int(value: str) -> int:
@@ -46,6 +48,15 @@ def non_negative_float(value: str) -> float:
     return parsed
 
 
+def row_ratio(value: str) -> float:
+    """Argparse validator for a fraction between 0 (exclusive) and 1."""
+
+    parsed = float(value)
+    if not 0 < parsed <= 1:
+        raise argparse.ArgumentTypeError("value must be greater than 0 and at most 1")
+    return parsed
+
+
 def build_config(args: argparse.Namespace) -> ScrapeConfig:
     """Map parsed CLI arguments into a strongly typed scrape config."""
 
@@ -59,6 +70,8 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         page_delay_seconds=args.page_delay_seconds,
         row_count_poll_timeout=args.row_count_poll_timeout,
         database_url=args.database_url or None,
+        min_row_ratio=args.min_row_ratio,
+        allow_degraded=args.allow_degraded,
     )
 
 
@@ -156,6 +169,23 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser, runtime_config: Runti
         ),
     )
     parser.add_argument(
+        "--min-row-ratio",
+        type=row_ratio,
+        default=DEFAULT_MIN_ROW_RATIO,
+        help=(
+            "Quality gate: the run is rejected (exit 3, nothing stored) if it scrapes fewer "
+            "than this fraction of page-count x min-rows-per-page rows."
+        ),
+    )
+    parser.add_argument(
+        "--allow-degraded",
+        action="store_true",
+        help=(
+            "Store the run even if the quality gate fails (failed pages, fallback parsers, "
+            "too few rows, duplicates). For manual recovery only."
+        ),
+    )
+    parser.add_argument(
         "--headed",
         action="store_true",
         help="Run Chrome with a visible browser window instead of headless mode.",
@@ -171,7 +201,18 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
     LOGGER.info("Starting scrape run with database %s", database_config.display_url)
     conn = create_connection(config.db_path, database_url=database_config.url)
     try:
-        players = scrape_rankings(config=config, headless=not headed)
+        result = scrape_rankings(config=config, headless=not headed)
+        problems = check_scrape(result, config.min_rows_per_page, config.min_row_ratio)
+        if problems and not config.allow_degraded:
+            for problem in problems:
+                LOGGER.error("Quality gate: %s", problem)
+            print("Quality gate failed; nothing was stored:", file=sys.stderr)
+            for problem in problems:
+                print(f"  - {problem}", file=sys.stderr)
+            return EXIT_QUALITY_FAILED
+        for problem in problems:
+            LOGGER.warning("Quality gate overridden by --allow-degraded: %s", problem)
+        players = result.records
         insert_player_data(conn, players)
     finally:
         conn.close()

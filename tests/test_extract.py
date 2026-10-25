@@ -63,12 +63,12 @@ def test_extract_page_records_with_retry_retries_then_succeeds(monkeypatch) -> N
         observed["calls"] += 1
         if observed["calls"] < 3:
             raise RuntimeError("temporary layout failure")
-        return expected
+        return expected, "html"
 
     monkeypatch.setattr(extract, "extract_page_records", fake_extract_page_records)
     monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
 
-    records = extract.extract_page_records_with_retry(
+    page = extract.extract_page_records_with_retry(
         driver=object(),
         wait=object(),
         page_number=0,
@@ -78,7 +78,7 @@ def test_extract_page_records_with_retry_retries_then_succeeds(monkeypatch) -> N
         retry_attempts=2,
     )
 
-    assert records == expected
+    assert page == (expected, "html")
     assert observed["calls"] == 3
 
 
@@ -223,7 +223,7 @@ def test_scrape_rankings_skips_failed_page_and_keeps_others(monkeypatch, tmp_pat
         page_number = kwargs["page_number"]
         if page_number == 1:
             raise RuntimeError("still failing")
-        return [_make_player(page_number)]
+        return [_make_player(page_number)], "html"
 
     monkeypatch.setattr(extract, "extract_page_records_with_retry", fake_extract_with_retry)
     monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
@@ -236,9 +236,11 @@ def test_scrape_rankings_skips_failed_page_and_keeps_others(monkeypatch, tmp_pat
         db_path=tmp_path / "run.db",
     )
 
-    players = extract.scrape_rankings(config=config, headless=True)
+    result = extract.scrape_rankings(config=config, headless=True)
 
-    assert [player.rank_overall for player in players] == [0, 2]
+    assert [player.rank_overall for player in result.records] == [0, 2]
+    assert result.failed_pages == [2]
+    assert result.page_count == 3
 
 
 def test_scrape_rankings_raises_when_every_page_fails(monkeypatch, tmp_path: Path) -> None:
@@ -268,7 +270,7 @@ def test_scrape_rankings_uses_one_utc_timestamp_for_every_page(monkeypatch, tmp_
 
     def fake_extract_with_retry(**kwargs):
         observed_timestamps.append(kwargs["scrape_timestamp"])
-        return [_make_player(kwargs["page_number"])]
+        return [_make_player(kwargs["page_number"])], "html"
 
     monkeypatch.setattr(extract, "extract_page_records_with_retry", fake_extract_with_retry)
     monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
@@ -315,7 +317,7 @@ class _PageDriver:
         return _FakeElement(self.container_text)
 
 
-def _extract_from(driver: _PageDriver, monkeypatch) -> list[PlayerRecord]:
+def _extract_from(driver: _PageDriver, monkeypatch) -> tuple[list[PlayerRecord], str]:
     monkeypatch.setattr(extract, "wait_for_rankings", lambda *args: None)
     return extract.extract_page_records(
         driver=driver,
@@ -330,10 +332,11 @@ def _extract_from(driver: _PageDriver, monkeypatch) -> list[PlayerRecord]:
 def test_extract_page_records_parses_page_html(monkeypatch, legacy_row_html: str) -> None:
     driver = _PageDriver(legacy_row_html)
 
-    records = _extract_from(driver, monkeypatch)
+    records, parser = _extract_from(driver, monkeypatch)
 
     assert driver.visited == ["https://example.com?page=2"]
     assert [record.player_name for record in records] == ["Josh Allen"]
+    assert parser == "html"
 
 
 def test_extract_page_records_falls_back_to_live_row_text(monkeypatch) -> None:
@@ -342,9 +345,10 @@ def test_extract_page_records_falls_back_to_live_row_text(monkeypatch) -> None:
         row_texts=["1\nBijan RobinsonATL\nRB1\n24.1 y.o.\nTier 1\n1\n9999", "   "],
     )
 
-    records = _extract_from(driver, monkeypatch)
+    records, parser = _extract_from(driver, monkeypatch)
 
     assert [(record.player_name, record.team) for record in records] == [("Bijan Robinson", "ATL")]
+    assert parser == "dom-row-text"
 
 
 def test_extract_page_records_falls_back_to_container_text(
@@ -353,9 +357,10 @@ def test_extract_page_records_falls_back_to_container_text(
     container_text = extract_rankings_text_lines(text_layout_html)
     driver = _PageDriver("<html></html>", container_text="\n".join(container_text))
 
-    records = _extract_from(driver, monkeypatch)
+    records, parser = _extract_from(driver, monkeypatch)
 
     assert [record.player_name for record in records] == ["Bijan Robinson", "2027 Early 1st"]
+    assert parser == "dom-container-text"
 
 
 def test_extract_page_records_raises_with_diagnostics_when_nothing_parses(monkeypatch) -> None:
@@ -441,3 +446,37 @@ def test_close_popup_ignores_missing_modal(monkeypatch) -> None:
     monkeypatch.setattr(extract, "WebDriverWait", lambda driver, timeout: _PopupWait(None))
 
     assert extract.close_popup(object()) is None
+
+
+def test_extract_page_records_names_the_html_text_fallback(
+    monkeypatch, text_layout_html: str
+) -> None:
+    records, parser = _extract_from(_PageDriver(text_layout_html), monkeypatch)
+
+    assert [record.player_name for record in records] == ["Bijan Robinson", "2027 Early 1st"]
+    assert parser == "html-text"
+
+
+def test_scrape_rankings_records_pages_parsed_by_a_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(extract, "build_driver", lambda headless: (_StubDriver(), object()))
+    parsers = {0: "html", 1: "dom-row-text", 2: "html"}
+
+    def fake_extract_with_retry(**kwargs):
+        page_number = kwargs["page_number"]
+        return [_make_player(page_number)], parsers[page_number]
+
+    monkeypatch.setattr(extract, "extract_page_records_with_retry", fake_extract_with_retry)
+    monkeypatch.setattr(extract.time, "sleep", lambda seconds: None)
+    config = ScrapeConfig(
+        base_url="https://example.com?page={page}",
+        page_count=3,
+        min_rows_per_page=1,
+        retry_attempts=0,
+        db_path=tmp_path / "run.db",
+    )
+
+    result = extract.scrape_rankings(config=config, headless=True)
+
+    assert len(result.records) == 3
+    assert result.failed_pages == []
+    assert result.fallback_pages == {2: "dom-row-text"}
