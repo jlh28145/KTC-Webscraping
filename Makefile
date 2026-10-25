@@ -14,7 +14,7 @@ install:
 # Regenerate the pinned lock file from pyproject.toml (requires uv). Releases from the last
 # 14 days are skipped so the lock never pins a version that is brand new or not yet mirrored.
 lock:
-	uv pip compile pyproject.toml --extra dev --python-version 3.12 --exclude-newer "14 days" \
+	uv pip compile pyproject.toml --extra dev --python-version 3.12 --upgrade --exclude-newer "14 days" \
 		--quiet --custom-compile-command "make lock" -o requirements.txt
 
 lint:

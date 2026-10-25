@@ -1,17 +1,11 @@
-# Dependency updates, matching the lock's policy of skipping releases newer than
-# 14 days (see `make lock`). Updates arrive grouped, one PR per ecosystem.
+# Dependency updates for GitHub Actions, with a 14-day cooldown to match `make lock`.
+#
+# Python packages are intentionally not here: requirements.txt is a lock produced by
+# uv's resolver (`make lock`), and Dependabot bumps each pin on its own, which can
+# produce sets that don't install (PR #26: pyarrow 26 vs streamlit's pyarrow<26).
+# Refresh Python dependencies with `make lock` instead (monthly is plenty).
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: monthly
-    cooldown:
-      default-days: 14
-    groups:
-      python-dependencies:
-        patterns: ["*"]
-
   # Actions are pinned by commit SHA; Dependabot bumps the SHA and its version comment.
   # Note: a new actions/cache major can change the cache version and miss the stored
   # history; the scheduled scrape then restores it from the latest ktc-history artifact.
