@@ -13,7 +13,7 @@ The scraper is the easy part. This repo is a quality-engineering project. It sho
 ## What this project demonstrates
 
 - **Layered design that can be tested.** Extract, transform and load are separate modules. Parsing is pure and runs without a browser, and Selenium sits behind a narrow interface that tests replace with fakes.
-- **Deterministic tests over brittle end-to-end ones.** 124 tests run in about 2 seconds without network access or a browser (7 of them against a throwaway Postgres container). That includes a golden-file test against real KeepTradeCut markup, so a site redesign fails CI instead of quietly lowering data quality.
+- **Deterministic tests over brittle end-to-end ones.** 203 tests run in a few seconds without network access or a browser (30 of them against a throwaway Postgres container). That includes a golden-file test against real KeepTradeCut markup, so a site redesign fails CI instead of quietly lowering data quality.
 - **CI as a quality gate.** Every push and pull request runs Ruff lint, a format check, and the tests with a 90% coverage floor that counts every module, plus a smoke test of the installed command.
 - **Unattended scheduled runs.** A daily GitHub Actions job scrapes about 500 rankings, carries the database forward between runs to build history, and publishes a stable one-snapshot artifact for a downstream repo.
 - **Resilience learned from production.** Retries, pacing and per-page failure isolation were each added in response to observed live-site behavior, and each one has a regression test (see [Reliability design](#reliability-design)).
@@ -85,14 +85,15 @@ The live website is the least dependable part of the system, so it's the one thi
 
 | Layer | Tests | Approach |
 | --- | ---: | --- |
-| Transform | 25 | Pure-function tests on HTML and text fixtures, including a **golden-file snapshot of real KeepTradeCut markup** ([`tests/fixtures/`](tests/fixtures/)), malformed rows, draft picks, and names like `Kenneth Walker III` |
-| Extract | 20 | Selenium replaced by small fake drivers and waits: retry exhaustion, Selenium timeouts, short-page tolerance, block-page detection, every parsing fallback, driver setup |
-| Load (SQLite) | 22 | Real SQLite in `tmp_path`: schema, unique index, upserts, history across dates, validation failures, per-dialect SQL |
-| Load (Postgres) | 7 | Real `postgres:17` service container in CI: schema parity, type round-trips, upserts, history, CLI end-to-end. Skipped locally unless `KTC_TEST_POSTGRES_URL` is set, and a **hard failure** in CI if the URL is missing, so the tests can't silently skip |
-| API | 24 per backend | FastAPI `TestClient` against a seeded two-snapshot database, **run on both SQLite and Postgres**: filters, pagination, input validation, and 404/422/501/503 paths |
+| Transform | 30 | Pure-function tests on HTML and text fixtures, including a **golden-file snapshot of real KeepTradeCut markup** ([`tests/fixtures/`](tests/fixtures/)), malformed rows, draft picks, and names like `Kenneth Walker III` |
+| Extract | 22 | Selenium replaced by small fake drivers and waits: retry exhaustion, Selenium timeouts, short-page tolerance, block-page detection, every parsing fallback, driver setup |
+| Load (SQLite) | 32 | Real SQLite in `tmp_path`: schema, unique index, upserts, history across dates, validation failures, per-dialect SQL |
+| Load (Postgres) | 9 | Real `postgres:17` service container in CI: schema parity, type round-trips, upserts, history, CLI end-to-end. Skipped locally unless `KTC_TEST_POSTGRES_URL` is set, and a **hard failure** in CI if the URL is missing, so the tests can't silently skip |
+| API | 46 | FastAPI `TestClient` against a seeded two-snapshot database; every data-endpoint test **runs on both SQLite and Postgres**: filters, pagination, input validation, and 404/422/501/503 paths |
 | Dashboard | 5 | The real Streamlit script run headless with Streamlit's `AppTest` and the API stubbed: rendering, filters passed through, search, unreachable API, API errors |
-| CLI and config | 33 | Argument parsing, environment defaults, exit codes, the quality gate's accept/reject/override paths, and the installed `ktc-scrape` entry point |
-| Quality gate | 11 | Each check on its own: failed pages, fallback parsers, the row floor, duplicate players and ranks |
+| Export | 8 | The published one-snapshot `ktc.db`: latest date only, schema and column parity with history, no partial file on failure, the summary's ordering |
+| CLI and config | 38 | Argument parsing, environment defaults, exit codes, the quality gate's accept/reject/override paths, and the installed `ktc-scrape` entry point |
+| Quality gate | 13 | Each check on its own: failed pages, fallback parsers, the row floor, duplicate players and ranks |
 
 Coverage is enforced at 90% over **every** module, including the Selenium layer (currently about 98%). Coverage is a floor, not the goal: tests target behaviors that broke, or could break, against the live site.
 
@@ -107,6 +108,7 @@ Coverage is enforced at 90% over **every** module, including the Selenium layer 
 3. Publishes two artifacts, each kept for 14 days:
    - `scheduled-scrape-<run id>`: `ktc.db` with **only the latest snapshot**, plus `scrape_summary.txt` (row counts, history size, top 10). This is a contract: a downstream repo downloads the newest one daily and commits its `ktc.db`, so the file stays one snapshot (about 95 KB) instead of growing every day.
    - `ktc-history-<run id>`: the full history database.
+4. Notifies the downstream repo with a `repository_dispatch` event, so it syncs as soon as the artifact exists instead of waiting for a cron slot. This needs a token secret; the step skips cleanly without it and never fails the run.
 
 Runtime state stays out of Git: the database lives in the cache and in artifacts, never in commits.
 

@@ -94,3 +94,14 @@ jobs:
           path: artifacts/ktc.db
           if-no-files-found: error
           retention-days: 14
+
+      # Tell the downstream repo a fresh snapshot is ready, so its sync doesn't depend
+      # on cron timing. Optional: skipped until both secrets exist, and non-fatal because
+      # the artifact is already published (the downstream cron remains a fallback).
+      - name: Notify downstream repo
+        continue-on-error: true
+        env:
+          DISPATCH_TOKEN: ${{ secrets.KTC_DOWNSTREAM_DISPATCH_TOKEN }}
+          DOWNSTREAM_REPO: ${{ secrets.KTC_DOWNSTREAM_REPO }}
+          RUN_ID: ${{ github.run_id }}
+        run: .github/scripts/notify-downstream.sh
