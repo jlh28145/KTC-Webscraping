@@ -44,6 +44,8 @@ jobs:
 
       # Each run saves its DB under a unique key; restore-keys picks up the most
       # recent one so ktc_rankings accumulates history across scheduled runs.
+      # Keep this path unchanged: the cache version depends on it, and moving it
+      # would orphan the existing history.
       - name: Restore historical database
         uses: actions/cache@v4
         with:
@@ -59,62 +61,24 @@ jobs:
           echo "Starting scheduled scrape with PAGE_COUNT=${PAGE_COUNT}"
           ktc-scrape --page-count "${PAGE_COUNT}" --db-path "${KTC_DB_PATH}"
 
-      - name: Build scrape summary
-        env:
-          KTC_DB_PATH: artifacts/ktc.db
-        run: |
-          python - <<'PY'
-          import sqlite3
-          from pathlib import Path
-
-          db_path = Path("artifacts/ktc.db")
-          conn = sqlite3.connect(db_path)
-          total_rows = conn.execute("SELECT COUNT(*) FROM ktc_rankings").fetchone()[0]
-          scrape_dates = conn.execute(
-              "SELECT COUNT(DISTINCT scrape_date) FROM ktc_rankings"
-          ).fetchone()[0]
-          latest_scrape_date = conn.execute(
-              "SELECT MAX(scrape_date) FROM ktc_rankings"
-          ).fetchone()[0]
-          latest_scrape_rows = conn.execute(
-              "SELECT COUNT(*) FROM ktc_rankings WHERE scrape_date = ?",
-              (latest_scrape_date,),
-          ).fetchone()[0]
-          top_rows = conn.execute(
-              """
-              SELECT player_name, rank_overall, position, team
-              FROM ktc_rankings
-              WHERE scrape_date = ?
-              ORDER BY rank_overall ASC
-              LIMIT 10
-              """,
-              (latest_scrape_date,),
-          ).fetchall()
-          conn.close()
-
-          lines = [
-              f"Database path: {db_path}",
-              f"Total rows in artifact DB: {total_rows}",
-              f"Distinct scrape dates in history: {scrape_dates}",
-              f"Latest scrape date: {latest_scrape_date}",
-              f"Rows for latest scrape date: {latest_scrape_rows}",
-              "",
-              "Top 10 rows from latest scrape:",
-          ]
-          for player_name, rank_overall, position, team in top_rows:
-              lines.append(
-                  f"{rank_overall}. {player_name} ({position}) team={team}"
-              )
-
-          summary_text = "\n".join(lines)
-          Path("artifacts/scrape_summary.txt").write_text(summary_text, encoding="utf-8")
-          print(summary_text)
-          PY
+      # The scheduled-scrape-* artifact is a contract with a downstream repo that
+      # commits its ktc.db to Git: it must stay one snapshot per file. The
+      # full history (artifacts/ktc.db, also the cache path above) ships separately.
+      - name: Publish latest snapshot and summary
+        run: python -m ktc_webscraping.export --history artifacts/ktc.db --output-dir publish
 
       - name: Upload scrape artifacts
         uses: actions/upload-artifact@v6
         with:
           name: scheduled-scrape-${{ github.run_id }}
-          path: artifacts/
+          path: publish/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload history database
+        uses: actions/upload-artifact@v6
+        with:
+          name: ktc-history-${{ github.run_id }}
+          path: artifacts/ktc.db
           if-no-files-found: error
           retention-days: 14
