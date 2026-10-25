@@ -154,6 +154,7 @@ def test_run_uses_load_and_extract_layers(monkeypatch, tmp_path: Path, capsys) -
             tier=1,
             value=9989.0,
             scraped_at="2026-03-21T00:00:00",
+            ktc_player_id=1,
         )
     ]
     observed = {}
@@ -401,6 +402,7 @@ def _player(rank: int, name: str | None = None) -> PlayerRecord:
         tier=1,
         value=9000.0 - rank,
         scraped_at="2026-10-25T17:00:00+00:00",
+        ktc_player_id=rank,
     )
 
 
@@ -475,3 +477,54 @@ def test_quality_flags_reach_the_scrape_config() -> None:
 
     assert config.min_row_ratio == 0.9
     assert config.allow_degraded is True
+
+
+def test_run_rescrapes_once_when_the_gate_fails_and_stores_the_clean_run(
+    monkeypatch, tmp_path, caplog
+) -> None:
+    """Live 2026-10-25: rankings shifted mid-scrape and listed one player on two pages."""
+
+    clean = [_player(rank) for rank in range(1, 5)]
+    drifted = [_player(1), _player(2), _player(2), _player(4)]
+    results = iter(
+        [ScrapeResult(records=drifted, page_count=2), ScrapeResult(records=clean, page_count=2)]
+    )
+    stored = []
+    monkeypatch.setattr(cli, "scrape_rankings", lambda *, config, headless: next(results))
+    monkeypatch.setattr(cli, "insert_player_data", lambda conn, rows: stored.append(rows))
+
+    assert cli.run(config=_gate_config(tmp_path)) == 0
+
+    assert stored == [clean]
+    assert "Quality gate (attempt 1/2): Duplicate players" in caplog.text
+
+
+@pytest.mark.parametrize(("retries", "expected_scrapes"), [(0, 1), (1, 2), (2, 3)])
+def test_run_gives_up_after_the_configured_quality_retries(
+    monkeypatch, tmp_path, retries, expected_scrapes
+) -> None:
+    calls = []
+
+    def degraded(*, config, headless):
+        calls.append(1)
+        return ScrapeResult(records=[_player(1)], page_count=2)
+
+    monkeypatch.setattr(cli, "scrape_rankings", degraded)
+    monkeypatch.setattr(cli, "insert_player_data", lambda conn, rows: pytest.fail("stored"))
+
+    assert cli.run(config=_gate_config(tmp_path, quality_retries=retries)) == 3
+    assert len(calls) == expected_scrapes
+
+
+def test_allow_degraded_does_not_rescrape(monkeypatch, tmp_path) -> None:
+    calls = []
+
+    def degraded(*, config, headless):
+        calls.append(1)
+        return ScrapeResult(records=[_player(1)], page_count=2)
+
+    monkeypatch.setattr(cli, "scrape_rankings", degraded)
+    monkeypatch.setattr(cli, "insert_player_data", lambda conn, rows: None)
+
+    assert cli.run(config=_gate_config(tmp_path, allow_degraded=True)) == 0
+    assert len(calls) == 1

@@ -6,6 +6,7 @@ an empty ktc_rankings table, so point this at a disposable database only.
 """
 
 import os
+import zlib
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -55,6 +56,7 @@ def _record(scrape_date: str, name: str, rank: int | None, value: float, **overr
         tier=1,
         value=value,
         scraped_at=f"{scrape_date}T13:00:00+00:00",
+        ktc_player_id=zlib.crc32(name.encode()) % 100_000,
     )
     fields.update(overrides)
     return PlayerRecord(**fields)
@@ -77,7 +79,7 @@ def test_create_connection_builds_matching_schema(pg_conn) -> None:
     index = _rows(
         pg_conn,
         "SELECT indexdef FROM pg_indexes WHERE indexname = "
-        "'idx_ktc_rankings_scrape_date_player_source'",
+        "'idx_ktc_rankings_scrape_date_player_key_source'",
     )
 
     assert columns == [
@@ -93,9 +95,11 @@ def test_create_connection_builds_matching_schema(pg_conn) -> None:
         ("tier", "integer", "YES", "NO"),
         ("value", "double precision", "YES", "NO"),
         ("scraped_at", "text", "YES", "NO"),
+        ("ktc_player_id", "integer", "YES", "NO"),
+        ("player_key", "text", "YES", "NO"),
     ]
     assert "UNIQUE INDEX" in index[0][0]
-    assert "(scrape_date, player_name, source)" in index[0][0]
+    assert "(scrape_date, player_key, source)" in index[0][0]
 
 
 def test_insert_round_trips_types_and_nulls(pg_conn) -> None:
@@ -216,3 +220,39 @@ def test_same_day_rerun_replaces_the_snapshot(pg_conn) -> None:
     assert _rows(
         pg_conn, "SELECT player_name, rank_overall FROM ktc_rankings ORDER BY rank_overall"
     ) == [("Harrison Bryant", 463), ("Terrell Jennings", 464)]
+
+
+def test_migrates_a_pre_id_table(tmp_path: Path) -> None:
+    import psycopg
+
+    _drop_rankings_table()
+    with psycopg.connect(POSTGRES_URL, autocommit=True) as conn:
+        conn.execute(
+            """
+            CREATE TABLE ktc_rankings (
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, scrape_date TEXT NOT NULL,
+                player_name TEXT, position TEXT, rank_overall INTEGER, rank_position INTEGER,
+                team TEXT, source TEXT NOT NULL, age DOUBLE PRECISION, tier INTEGER,
+                value DOUBLE PRECISION, scraped_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX idx_ktc_rankings_scrape_date_player_source "
+            "ON ktc_rankings (scrape_date, player_name, source)"
+        )
+        conn.execute(
+            "INSERT INTO ktc_rankings (scrape_date, player_name, source) "
+            "VALUES ('2026-10-24', 'Jahmyr Gibbs', 'keeptradecut')"
+        )
+    try:
+        conn = create_connection(tmp_path / "unused.db", database_url=POSTGRES_URL)
+        rows = _rows(conn, "SELECT player_key FROM ktc_rankings")
+        indexes = {row[0] for row in _rows(conn, "SELECT indexname FROM pg_indexes")}
+        conn.close()
+    finally:
+        _drop_rankings_table()
+
+    assert rows == [("name:Jahmyr Gibbs",)]
+    assert "idx_ktc_rankings_scrape_date_player_key_source" in indexes
+    assert "idx_ktc_rankings_scrape_date_player_source" not in indexes

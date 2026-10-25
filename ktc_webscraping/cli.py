@@ -72,6 +72,7 @@ def build_config(args: argparse.Namespace) -> ScrapeConfig:
         database_url=args.database_url or None,
         min_row_ratio=args.min_row_ratio,
         allow_degraded=args.allow_degraded,
+        quality_retries=args.quality_retries,
     )
 
 
@@ -178,6 +179,16 @@ def _add_scrape_arguments(parser: argparse.ArgumentParser, runtime_config: Runti
         ),
     )
     parser.add_argument(
+        "--quality-retries",
+        type=non_negative_int,
+        default=1,
+        help=(
+            "Full re-scrapes to attempt when the quality gate fails, before rejecting the run. "
+            "Rankings can shift while pages load, listing one player on two pages; a fresh "
+            "scrape usually clears it."
+        ),
+    )
+    parser.add_argument(
         "--allow-degraded",
         action="store_true",
         help=(
@@ -201,8 +212,15 @@ def run(config: ScrapeConfig, headed: bool = False) -> int:
     LOGGER.info("Starting scrape run with database %s", database_config.display_url)
     conn = create_connection(config.db_path, database_url=database_config.url)
     try:
-        result = scrape_rankings(config=config, headless=not headed)
-        problems = check_scrape(result, config.min_rows_per_page, config.min_row_ratio)
+        attempts = config.quality_retries + 1
+        for attempt in range(1, attempts + 1):
+            result = scrape_rankings(config=config, headless=not headed)
+            problems = check_scrape(result, config.min_rows_per_page, config.min_row_ratio)
+            if not problems or config.allow_degraded or attempt == attempts:
+                break
+            for problem in problems:
+                LOGGER.warning("Quality gate (attempt %s/%s): %s", attempt, attempts, problem)
+            LOGGER.warning("Re-scraping in case the problem was transient")
         if problems and not config.allow_degraded:
             for problem in problems:
                 LOGGER.error("Quality gate: %s", problem)

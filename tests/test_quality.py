@@ -1,3 +1,5 @@
+import zlib
+
 import pytest
 
 from ktc_webscraping.models import PlayerRecord, ScrapeResult
@@ -17,6 +19,7 @@ def _player(rank: int | None, name: str, scrape_date: str = "2026-10-25") -> Pla
         tier=1,
         value=1000.0,
         scraped_at=f"{scrape_date}T17:00:00+00:00",
+        ktc_player_id=zlib.crc32(name.encode()),
     )
 
 
@@ -71,7 +74,7 @@ def test_duplicate_players_and_ranks_are_reported() -> None:
     problems = check_scrape(ScrapeResult(records=records, page_count=2), 5)
 
     assert problems == [
-        "Duplicate players in one snapshot: ['Player 9']",
+        f"Duplicate players in one snapshot: ['{records[-1].player_key}']",
         "Duplicate overall ranks in one snapshot: [9]",
     ]
 
@@ -86,3 +89,22 @@ def test_row_floor_ignores_float_noise() -> None:
     records = _clean(7)
 
     assert check_scrape(ScrapeResult(records=records, page_count=1), 100, 0.07) == []
+
+
+def test_rows_without_a_player_id_are_reported() -> None:
+    records = _clean(9) + [
+        PlayerRecord(**{**_player(10, "Player 10").__dict__, "ktc_player_id": None})
+    ]
+
+    assert check_scrape(ScrapeResult(records=records, page_count=2), 5) == [
+        "1 row(s) have no KeepTradeCut player id, so profile links may have changed: ['Player 10']"
+    ]
+
+
+def test_missing_ids_are_not_double_reported_on_fallback_pages() -> None:
+    records = [PlayerRecord(**{**r.__dict__, "ktc_player_id": None}) for r in _clean(10)]
+    result = ScrapeResult(records=records, page_count=2, fallback_pages={1: "dom-row-text"})
+
+    assert check_scrape(result, 5) == [
+        "Parsed by a fallback parser, so the site layout may have changed: page 1 (dom-row-text)"
+    ]
