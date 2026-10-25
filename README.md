@@ -141,7 +141,7 @@ Run `ktc-scrape --help` for the tuning flags (`--row-count-tolerance`, `--row-co
 
 ## Data model
 
-Each run writes one snapshot to `ktc_rankings`, with the same columns on SQLite and Postgres. A unique index on `(scrape_date, player_name, source)` makes re-running the same day idempotent (an upsert), while different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
+Each run writes one snapshot to `ktc_rankings`, with the same columns on SQLite and Postgres. A unique index on `(scrape_date, player_name, source)` keeps one row per player per day. Re-running the same day replaces that day's snapshot: players who dropped out since the earlier run are removed, and the rest are updated in place. Different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
 
 | Column | Notes |
 | --- | --- |

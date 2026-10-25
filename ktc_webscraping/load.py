@@ -188,12 +188,42 @@ def _connect_postgres(url: str) -> psycopg.Connection:
     return psycopg.connect(url, connect_timeout=10)
 
 
+def prune_snapshot_sql(dialect: SqlDialect, keep_count: int) -> str:
+    keep = ", ".join([dialect.placeholder] * keep_count)
+    return (
+        f"DELETE FROM ktc_rankings WHERE scrape_date = {dialect.placeholder} "
+        f"AND source = {dialect.placeholder} AND player_name NOT IN ({keep})"
+    )
+
+
 def insert_player_data(conn: DatabaseConnection, players: list[PlayerRecord]) -> None:
-    """Validate and upsert one batch of records in a single transaction."""
+    """Store a batch as the complete snapshot for each of its scrape dates.
+
+    A batch is one scrape run. Rerunning a date that is already stored replaces
+    that day's snapshot: players who dropped out of the rankings since the
+    earlier run are removed, and the rest are upserted in place (keeping their
+    ids). Without the prune step a same-day rerun would mix two runs, leaving
+    stale players behind with duplicate ranks. Other dates are never touched,
+    and everything happens in one transaction.
+    """
 
     validate_player_records(players)
     if not players:
         return
+
+    snapshots: dict[tuple[str, str], set[str]] = {}
+    for player in players:
+        snapshots.setdefault((player.scrape_date, player.source), set()).add(player.player_name)
+
+    dialect = dialect_for(conn)
     cursor = conn.cursor()
-    cursor.executemany(upsert_sql(dialect_for(conn)), [player_to_row(p) for p in players])
+    try:
+        for (scrape_date, source), names in snapshots.items():
+            cursor.execute(
+                prune_snapshot_sql(dialect, len(names)), (scrape_date, source, *sorted(names))
+            )
+        cursor.executemany(upsert_sql(dialect), [player_to_row(p) for p in players])
+    except Exception:
+        conn.rollback()
+        raise
     conn.commit()
