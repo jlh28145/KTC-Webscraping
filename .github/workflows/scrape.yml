@@ -6,9 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       page_count:
-        description: Number of ranking pages to scrape
+        description: Pages to scrape. Keep 10 for a full snapshot; fewer replaces today's snapshot with a partial one
         required: false
         default: "10"
+      start_fresh:
+        description: Start a new history if neither the cache nor a ktc-history artifact has one
+        type: boolean
+        default: false
 
 concurrency:
   group: scheduled-scrape
@@ -20,6 +24,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      actions: read # list and download ktc-history artifacts when the cache misses
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -52,6 +57,13 @@ jobs:
           path: artifacts/ktc.db
           key: ktc-db-${{ github.run_id }}
           restore-keys: ktc-db-
+
+      - name: Recover history from the latest ktc-history artifact
+        if: hashFiles('artifacts/ktc.db') == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          START_FRESH: ${{ inputs.start_fresh || 'false' }}
+        run: .github/scripts/restore-history.sh
 
       - name: Run scheduled scrape
         env:

@@ -101,7 +101,7 @@ Coverage is enforced at 90% over **every** module, including the Selenium layer 
 
 **[`scrape.yml`](.github/workflows/scrape.yml)** runs daily (13:00 UTC) or on manual dispatch:
 
-1. Restores the previous run's database from the Actions cache, so `ktc_rankings` keeps building history.
+1. Restores the previous run's database from the Actions cache, so `ktc_rankings` keeps building history. If the cache misses (evicted after 7 days unused, a failed save, or a new `actions/cache` major), it restores the newest `ktc-history` artifact instead. If neither exists, the job fails rather than silently starting an empty history; a manual run with `start_fresh` begins a new one on purpose.
 2. Runs `ktc-scrape` for 10 pages (about 500 rankings). A **quality gate** rejects a degraded run before anything is stored: failed pages, pages read by a fallback parser, fewer than 98% of the expected rows, or duplicate players or ranks. The job then fails (exit 3) and publishes nothing, so downstream consumers keep the last good snapshot.
 3. Publishes two artifacts, each kept for 14 days:
    - `scheduled-scrape-<run id>`: `ktc.db` with **only the latest snapshot**, plus `scrape_summary.txt` (row counts, history size, top 10). This is a contract: a downstream repo downloads the newest one daily and commits its `ktc.db`, so the file stays one snapshot (about 95 KB) instead of growing every day.
