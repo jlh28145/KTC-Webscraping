@@ -46,10 +46,17 @@ def check_scrape(
             f"({min_row_ratio:.0%} of {expected_rows})"
         )
 
-    name_counts = Counter((record.scrape_date, record.player_name) for record in result.records)
-    duplicate_names = sorted(name for (_, name), count in name_counts.items() if count > 1)
-    if duplicate_names:
-        problems.append(f"Duplicate players in one snapshot: {duplicate_names[:5]}")
+    key_counts = Counter((record.scrape_date, record.player_key) for record in result.records)
+    duplicate_keys = sorted(key for (_, key), count in key_counts.items() if count > 1)
+    if duplicate_keys:
+        problems.append(f"Duplicate players in one snapshot: {duplicate_keys[:5]}")
+
+    missing_ids = [record.player_name for record in result.records if record.ktc_player_id is None]
+    if missing_ids and not result.fallback_pages:
+        problems.append(
+            f"{len(missing_ids)} row(s) have no KeepTradeCut player id, so profile links may "
+            f"have changed: {missing_ids[:5]}"
+        )
 
     rank_counts = Counter(
         (record.scrape_date, record.rank_overall)

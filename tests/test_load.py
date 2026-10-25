@@ -83,7 +83,7 @@ def test_dialects_render_backend_specific_sql(dialect, placeholder, id_column, f
     upsert = upsert_sql(dialect)
 
     assert upsert.count(placeholder) == len(RANKING_COLUMNS)
-    assert "ON CONFLICT (scrape_date, player_name, source) DO UPDATE" in upsert
+    assert "ON CONFLICT (scrape_date, player_key, source) DO UPDATE" in upsert
     assert f"id {id_column}" in create_table_sql(dialect)
     assert f"value {float_type}" in create_table_sql(dialect)
 
@@ -115,21 +115,24 @@ def test_create_connection_creates_expected_rankings_schema(temp_db_path) -> Non
         (9, "tier", "INTEGER", 0, None, 0),
         (10, "value", "REAL", 0, None, 0),
         (11, "scraped_at", "TEXT", 0, None, 0),
+        (12, "ktc_player_id", "INTEGER", 0, None, 0),
+        (13, "player_key", "TEXT", 0, None, 0),
     ]
 
 
-def test_create_connection_creates_unique_index_for_scrape_date_player_and_source(
-    temp_db_path,
-) -> None:
+def test_create_connection_creates_unique_index_on_player_key(temp_db_path) -> None:
     conn = create_connection(temp_db_path)
 
-    indexes = conn.execute("PRAGMA index_list(ktc_rankings)").fetchall()
+    indexes = {row[1]: row for row in conn.execute("PRAGMA index_list(ktc_rankings)")}
+    key_columns = [
+        row[2]
+        for row in conn.execute("PRAGMA index_info(idx_ktc_rankings_scrape_date_player_key_source)")
+    ]
     conn.close()
 
-    assert any(
-        index[1] == "idx_ktc_rankings_scrape_date_player_source" and index[2] == 1
-        for index in indexes
-    )
+    assert indexes["idx_ktc_rankings_scrape_date_player_key_source"][2] == 1
+    assert "idx_ktc_rankings_scrape_date_player_source" not in indexes
+    assert key_columns == ["scrape_date", "player_key", "source"]
 
 
 def test_create_connection_retires_legacy_players_table(temp_db_path) -> None:
@@ -541,3 +544,131 @@ def test_failed_batch_rolls_back_the_prune(temp_db_path, monkeypatch) -> None:
     names = conn.execute("SELECT player_name FROM ktc_rankings").fetchall()
     conn.close()
     assert names == [("Ray-Ray McCloud",)]
+
+
+def _legacy_history_db(path) -> None:
+    """A history table exactly as the scheduled scrape wrote it before player ids."""
+
+    conn = sqlite3.connect(path)
+    conn.execute(
+        """
+        CREATE TABLE ktc_rankings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, scrape_date TEXT NOT NULL, player_name TEXT,
+            position TEXT, rank_overall INTEGER, rank_position INTEGER, team TEXT,
+            source TEXT NOT NULL, age REAL, tier INTEGER, value REAL, scraped_at TEXT
+        )
+        """
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX idx_ktc_rankings_scrape_date_player_source "
+        "ON ktc_rankings (scrape_date, player_name, source)"
+    )
+    conn.executemany(
+        "INSERT INTO ktc_rankings (scrape_date, player_name, position, rank_overall, source) "
+        "VALUES (?, ?, 'RB', ?, 'keeptradecut')",
+        [("2026-10-24", "Jahmyr Gibbs", 1), ("2026-10-24", "Bijan Robinson", 2)],
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_create_connection_migrates_a_pre_id_history_table(temp_db_path) -> None:
+    _legacy_history_db(temp_db_path)
+
+    conn = create_connection(temp_db_path)
+    rows = conn.execute(
+        "SELECT id, player_name, ktc_player_id, player_key FROM ktc_rankings ORDER BY id"
+    ).fetchall()
+    indexes = [row[1] for row in conn.execute("PRAGMA index_list(ktc_rankings)")]
+    conn.close()
+
+    assert rows == [
+        (1, "Jahmyr Gibbs", None, "name:Jahmyr Gibbs"),
+        (2, "Bijan Robinson", None, "name:Bijan Robinson"),
+    ]
+    assert "idx_ktc_rankings_scrape_date_player_key_source" in indexes
+    assert "idx_ktc_rankings_scrape_date_player_source" not in indexes
+
+
+def test_migration_is_idempotent_and_new_rows_use_ids(temp_db_path) -> None:
+    _legacy_history_db(temp_db_path)
+    create_connection(temp_db_path).close()
+
+    conn = create_connection(temp_db_path)
+    insert_player_data(
+        conn,
+        [
+            PlayerRecord(
+                "2026-10-25",
+                "Jahmyr Gibbs",
+                "RB",
+                1,
+                1,
+                "DET",
+                "keeptradecut",
+                24.6,
+                1,
+                9999.0,
+                "2026-10-25T17:00:00+00:00",
+                ktc_player_id=1415,
+            )
+        ],
+    )
+    rows = conn.execute(
+        "SELECT scrape_date, player_key FROM ktc_rankings ORDER BY scrape_date, id"
+    ).fetchall()
+    conn.close()
+
+    assert rows == [
+        ("2026-10-24", "name:Jahmyr Gibbs"),
+        ("2026-10-24", "name:Bijan Robinson"),
+        ("2026-10-25", "ktc:1415"),
+    ]
+
+
+def test_two_players_sharing_a_name_are_kept_apart(temp_db_path) -> None:
+    conn = create_connection(temp_db_path)
+    twins = [
+        PlayerRecord(
+            "2026-10-25",
+            "Josh Allen",
+            position,
+            rank,
+            1,
+            team,
+            "keeptradecut",
+            None,
+            1,
+            1000.0,
+            "2026-10-25T17:00:00+00:00",
+            ktc_player_id=player_id,
+        )
+        for position, rank, team, player_id in [("QB", 1, "BUF", 1001), ("LB", 400, "JAC", 2002)]
+    ]
+
+    insert_player_data(conn, twins)
+    rows = conn.execute(
+        "SELECT player_name, position, ktc_player_id FROM ktc_rankings ORDER BY rank_overall"
+    ).fetchall()
+    conn.close()
+
+    assert rows == [("Josh Allen", "QB", 1001), ("Josh Allen", "LB", 2002)]
+
+
+def test_player_key_prefers_the_ktc_id() -> None:
+    record = PlayerRecord(
+        "2026-10-25",
+        "Josh Allen",
+        "QB",
+        1,
+        1,
+        "BUF",
+        "keeptradecut",
+        30.4,
+        1,
+        9999.0,
+        "2026-10-25T17:00:00+00:00",
+    )
+
+    assert record.player_key == "name:Josh Allen"
+    assert PlayerRecord(**{**record.__dict__, "ktc_player_id": 7}).player_key == "ktc:7"

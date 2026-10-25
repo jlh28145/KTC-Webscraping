@@ -123,6 +123,7 @@ Most of these came from failures observed on the live site or in scheduled runs;
 | The site redesigned its row markup and the HTML parser silently matched nothing | The parser handles both layouts, and a golden-file test on captured live markup guards against the next change |
 | Pages that never populate | Anti-bot markers (captcha, Cloudflare, …) are detected and reported in the failure message |
 | Retries, skips and fallbacks kept a degraded run green, and its artifact became what downstream synced | A quality gate rejects the run instead (exit 3, nothing stored or published); `--allow-degraded` is a deliberate manual override |
+| Rankings can shift while the 10 pages load, so one player is listed on two pages and another is missed. The old name key quietly merged the two rows | Players are keyed by KeepTradeCut id, the gate flags the duplicate, and the run is re-scraped once (`--quality-retries`) before being rejected |
 
 ## Configuration
 
@@ -143,12 +144,13 @@ Run `ktc-scrape --help` for the tuning flags (`--row-count-tolerance`, `--row-co
 
 ## Data model
 
-Each run writes one snapshot to `ktc_rankings`, with the same columns on SQLite and Postgres. A unique index on `(scrape_date, player_name, source)` keeps one row per player per day. Re-running the same day replaces that day's snapshot: players who dropped out since the earlier run are removed, and the rest are updated in place. Different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
+Each run writes one snapshot to `ktc_rankings`, with the same columns on SQLite and Postgres. A unique index on `(scrape_date, player_key, source)` keeps one row per player per day. `player_key` is `ktc:<id>`, using KeepTradeCut's own player id from the profile link, so two players who share a name stay separate. Rows from before ids were collected, or from a text fallback parser, use `name:<player name>`. Re-running the same day replaces that day's snapshot: players who dropped out since the earlier run are removed, and the rest are updated in place. Different days accumulate history. Every record in a run shares a single UTC timestamp, so a run that crosses midnight still lands on one `scrape_date`.
 
 | Column | Notes |
 | --- | --- |
 | `scrape_date`, `scraped_at` | UTC snapshot date and full timestamp |
 | `player_name`, `position`, `team` | Team codes follow KeepTradeCut (`KCC`, `SFO`, `FA`, …) |
+| `ktc_player_id`, `player_key` | KeepTradeCut's numeric player id (e.g. `1415` from `/players/jahmyr-gibbs-1415`) and the identity key built from it |
 | `rank_overall`, `rank_position` | `NULL` for draft picks, which KeepTradeCut lists without a rank |
 | `age`, `tier`, `value` | `value` is KeepTradeCut's trade value (top player = 9999) |
 

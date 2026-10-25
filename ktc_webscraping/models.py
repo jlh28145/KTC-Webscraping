@@ -40,6 +40,19 @@ class PlayerRecord:
     tier: int | None
     value: float | None
     scraped_at: str
+    ktc_player_id: int | None = None
+
+    @property
+    def player_key(self) -> str:
+        """Identity within a snapshot: KeepTradeCut's id when known, else the name.
+
+        Keying on the id keeps two players who share a name apart; the name
+        fallback covers rows from text-layout parsers and pre-id history.
+        """
+
+        if self.ktc_player_id is not None:
+            return f"ktc:{self.ktc_player_id}"
+        return f"name:{self.player_name}"
 
 
 # Which parser produced a page's records. Only HTML_PARSER is the primary path;
@@ -73,3 +86,4 @@ class ScrapeConfig:
     database_url: str | None = None
     min_row_ratio: float = 0.98
     allow_degraded: bool = False
+    quality_retries: int = 1

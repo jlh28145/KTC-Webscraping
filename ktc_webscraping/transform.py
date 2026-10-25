@@ -32,6 +32,16 @@ def normalize_position(position_text: str) -> tuple[str, int | None]:
     return position, position_rank
 
 
+PLAYER_ID_PATTERN = re.compile(r"-(\d+)/?$")
+
+
+def parse_player_id(href: str | None) -> int | None:
+    """KeepTradeCut's numeric id from a profile link like ``/players/jahmyr-gibbs-1415``."""
+
+    match = PLAYER_ID_PATTERN.search(href or "")
+    return int(match.group(1)) if match else None
+
+
 def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
     """Parse one ``.onePlayer`` row from either the legacy or the current layout.
 
@@ -74,6 +84,7 @@ def parse_player_row(row, scrape_timestamp: str) -> PlayerRecord | None:
         tier=safe_int(tier_node.get_text(strip=True).replace("Tier ", "")),
         value=safe_float(value_node.get_text(strip=True)),
         scraped_at=scrape_timestamp,
+        ktc_player_id=parse_player_id(name_node.get("href")),
     )
 
 

@@ -43,6 +43,8 @@ RANKING_COLUMNS = (
     "tier",
     "value",
     "scraped_at",
+    "ktc_player_id",
+    "player_key",
 )
 
 
@@ -94,6 +96,8 @@ def player_to_row(player: PlayerRecord) -> tuple:
         player.tier,
         player.value,
         player.scraped_at,
+        player.ktc_player_id,
+        player.player_key,
     )
 
 
@@ -123,15 +127,20 @@ def create_table_sql(dialect: SqlDialect) -> str:
             age {dialect.float_type},
             tier INTEGER,
             value {dialect.float_type},
-            scraped_at TEXT
+            scraped_at TEXT,
+            ktc_player_id INTEGER,
+            player_key TEXT
         )
         """
 
 
 CREATE_UNIQUE_INDEX_SQL = """
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_ktc_rankings_scrape_date_player_source
-    ON ktc_rankings (scrape_date, player_name, source)
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ktc_rankings_scrape_date_player_key_source
+    ON ktc_rankings (scrape_date, player_key, source)
     """
+
+# The original key was the player name, which let two same-name players collide.
+LEGACY_NAME_INDEX = "idx_ktc_rankings_scrape_date_player_source"
 
 
 def upsert_sql(dialect: SqlDialect) -> str:
@@ -139,7 +148,9 @@ def upsert_sql(dialect: SqlDialect) -> str:
     return f"""
         INSERT INTO ktc_rankings ({", ".join(RANKING_COLUMNS)})
         VALUES ({placeholders})
-        ON CONFLICT (scrape_date, player_name, source) DO UPDATE SET
+        ON CONFLICT (scrape_date, player_key, source) DO UPDATE SET
+            player_name = excluded.player_name,
+            ktc_player_id = excluded.ktc_player_id,
             position = excluded.position,
             rank_overall = excluded.rank_overall,
             rank_position = excluded.rank_position,
@@ -169,6 +180,7 @@ def create_connection(db_file: Path | str, database_url: str | None = None) -> D
     dialect = dialect_for(conn)
     cursor = conn.cursor()
     cursor.execute(create_table_sql(dialect))
+    _migrate_to_player_key(cursor)
     cursor.execute(CREATE_UNIQUE_INDEX_SQL)
     if dialect is SQLITE:
         # Retire the table used by the original prototype scraper.
@@ -176,6 +188,25 @@ def create_connection(db_file: Path | str, database_url: str | None = None) -> D
         cursor.execute("DROP INDEX IF EXISTS idx_players_player_name_scraped_at")
     conn.commit()
     return conn
+
+
+def _migrate_to_player_key(cursor) -> None:
+    """Upgrade a pre-id table in place: add the id/key columns and re-key on player_key.
+
+    Existing rows have no KeepTradeCut id, so their key is ``name:<player name>``,
+    exactly what the old name-based unique index enforced. Idempotent.
+    """
+
+    cursor.execute("SELECT * FROM ktc_rankings WHERE 1 = 0")
+    columns = {column[0] for column in cursor.description}
+    if "ktc_player_id" not in columns:
+        cursor.execute("ALTER TABLE ktc_rankings ADD COLUMN ktc_player_id INTEGER")
+    if "player_key" not in columns:
+        cursor.execute("ALTER TABLE ktc_rankings ADD COLUMN player_key TEXT")
+    cursor.execute(
+        "UPDATE ktc_rankings SET player_key = 'name:' || player_name WHERE player_key IS NULL"
+    )
+    cursor.execute(f"DROP INDEX IF EXISTS {LEGACY_NAME_INDEX}")
 
 
 def _connect_postgres(url: str) -> psycopg.Connection:
@@ -192,7 +223,7 @@ def prune_snapshot_sql(dialect: SqlDialect, keep_count: int) -> str:
     keep = ", ".join([dialect.placeholder] * keep_count)
     return (
         f"DELETE FROM ktc_rankings WHERE scrape_date = {dialect.placeholder} "
-        f"AND source = {dialect.placeholder} AND player_name NOT IN ({keep})"
+        f"AND source = {dialect.placeholder} AND player_key NOT IN ({keep})"
     )
 
 
@@ -213,7 +244,7 @@ def insert_player_data(conn: DatabaseConnection, players: list[PlayerRecord]) ->
 
     snapshots: dict[tuple[str, str], set[str]] = {}
     for player in players:
-        snapshots.setdefault((player.scrape_date, player.source), set()).add(player.player_name)
+        snapshots.setdefault((player.scrape_date, player.source), set()).add(player.player_key)
 
     dialect = dialect_for(conn)
     cursor = conn.cursor()

@@ -7,6 +7,7 @@ from ktc_webscraping.models import PlayerRecord
 from ktc_webscraping.transform import (
     extract_rankings_text_lines,
     normalize_position,
+    parse_player_id,
     parse_player_row,
     parse_player_rows,
     parse_player_rows_from_text,
@@ -360,6 +361,7 @@ def test_parse_player_rows_handles_live_layout_snapshot() -> None:
             1,
             9999.0,
             timestamp,
+            ktc_player_id=1415,
         ),
         PlayerRecord(
             "2026-10-19",
@@ -373,6 +375,7 @@ def test_parse_player_rows_handles_live_layout_snapshot() -> None:
             1,
             9998.0,
             timestamp,
+            ktc_player_id=1414,
         ),
         PlayerRecord(
             "2026-10-19",
@@ -386,5 +389,28 @@ def test_parse_player_rows_handles_live_layout_snapshot() -> None:
             3,
             6871.0,
             timestamp,
+            ktc_player_id=1702,
         ),
     ]
+
+
+@pytest.mark.parametrize(
+    ("href", "expected"),
+    [
+        ("/dynasty-rankings/players/jahmyr-gibbs-1415", 1415),
+        ("/dynasty-rankings/players/2027-early-1st-1702/", 1702),
+        ("/dynasty-rankings/players/no-id-here", None),
+        (None, None),
+    ],
+)
+def test_parse_player_id_reads_the_trailing_number(href, expected) -> None:
+    assert parse_player_id(href) == expected
+
+
+def test_legacy_rows_without_links_have_no_player_id(
+    legacy_row_html: str, scrape_timestamp: str
+) -> None:
+    record = parse_player_rows(legacy_row_html, scrape_timestamp)[0]
+
+    assert record.ktc_player_id is None
+    assert record.player_key == "name:Josh Allen"
