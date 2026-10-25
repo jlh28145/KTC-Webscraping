@@ -15,7 +15,7 @@ The scraper is the easy part. This repo is a quality-engineering project. It sho
 - **Layered design that can be tested.** Extract, transform and load are separate modules. Parsing is pure and runs without a browser, and Selenium sits behind a narrow interface that tests replace with fakes.
 - **Deterministic tests over brittle end-to-end ones.** 124 tests run in about 2 seconds without network access or a browser (7 of them against a throwaway Postgres container). That includes a golden-file test against real KeepTradeCut markup, so a site redesign fails CI instead of quietly lowering data quality.
 - **CI as a quality gate.** Every push and pull request runs Ruff lint, a format check, and the tests with a 90% coverage floor that counts every module, plus a smoke test of the installed command.
-- **Unattended scheduled runs.** A daily GitHub Actions job scrapes about 500 rankings, carries the database forward between runs to build history, and publishes the database and a run summary as artifacts.
+- **Unattended scheduled runs.** A daily GitHub Actions job scrapes about 500 rankings, carries the database forward between runs to build history, and publishes a stable one-snapshot artifact for a downstream repo.
 - **Resilience learned from production.** Retries, pacing and per-page failure isolation were each added in response to observed live-site behavior, and each one has a regression test (see [Reliability design](#reliability-design)).
 - **Portable persistence.** One schema and one idempotent upsert run on SQLite locally and on Postgres. The Postgres path is integration-tested in CI against a real `postgres:17` service container.
 - **Reproducible environments.** Dependencies are declared in `pyproject.toml` and locked with `uv`, skipping releases newer than 14 days.
@@ -48,6 +48,7 @@ flowchart TB
 | [`ktc_webscraping/extract.py`](ktc_webscraping/extract.py) | Browser control, waits, retries, pacing, block-page detection |
 | [`ktc_webscraping/transform.py`](ktc_webscraping/transform.py) | Pure parsing of ranking rows into typed `PlayerRecord`s |
 | [`ktc_webscraping/load.py`](ktc_webscraping/load.py) | Schema creation, record validation, idempotent upserts (SQLite and Postgres dialects) |
+| [`ktc_webscraping/export.py`](ktc_webscraping/export.py) | Cuts the latest snapshot and run summary out of the history database for the published artifact |
 | [`ktc_webscraping/models.py`](ktc_webscraping/models.py) | Frozen dataclasses shared across layers |
 | [`app/main.py`](app/main.py) | Read-only FastAPI service over the stored snapshots |
 | [`dashboard/dashboard.py`](dashboard/dashboard.py) | Streamlit demo UI on top of the API |
@@ -101,7 +102,9 @@ Coverage is enforced at 90% over **every** module, including the Selenium layer 
 
 1. Restores the previous run's database from the Actions cache, so `ktc_rankings` keeps building history.
 2. Runs `ktc-scrape` for 10 pages (about 500 rankings).
-3. Writes a summary (row counts, distinct snapshot dates, top 10) and uploads the database and summary as artifacts kept for 14 days.
+3. Publishes two artifacts, each kept for 14 days:
+   - `scheduled-scrape-<run id>`: `ktc.db` with **only the latest snapshot**, plus `scrape_summary.txt` (row counts, history size, top 10). This is a contract: a downstream repo downloads the newest one daily and commits its `ktc.db`, so the file stays one snapshot (about 95 KB) instead of growing every day.
+   - `ktc-history-<run id>`: the full history database.
 
 Runtime state stays out of Git: the database lives in the cache and in artifacts, never in commits.
 
