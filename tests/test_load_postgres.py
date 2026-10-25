@@ -191,3 +191,24 @@ def test_cli_run_writes_to_postgres(pg_conn, monkeypatch, tmp_path: Path, capsys
         assert f":{password}@" not in output
         assert ":***@" in output
     assert not (tmp_path / "ignored.db").exists()
+
+
+def test_same_day_rerun_replaces_the_snapshot(pg_conn) -> None:
+    insert_player_data(
+        pg_conn,
+        [
+            _record("2026-10-25", "Harrison Bryant", 462, 451.0),
+            _record("2026-10-25", "Ray-Ray McCloud", 463, 452.0),
+        ],
+    )
+    insert_player_data(
+        pg_conn,
+        [
+            _record("2026-10-25", "Harrison Bryant", 463, 450.0),
+            _record("2026-10-25", "Terrell Jennings", 464, 449.0),
+        ],
+    )
+
+    assert _rows(
+        pg_conn, "SELECT player_name, rank_overall FROM ktc_rankings ORDER BY rank_overall"
+    ) == [("Harrison Bryant", 463), ("Terrell Jennings", 464)]

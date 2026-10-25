@@ -456,3 +456,88 @@ def test_load_layer_returns_sqlite_connection(temp_db_path) -> None:
 )
 def test_display_url_masks_passwords(database_url: str, expected: str) -> None:
     assert build_database_config(database_url=database_url).display_url == expected
+
+
+def _snapshot_player(scrape_date: str, name: str, rank: int, source: str = "keeptradecut"):
+    return PlayerRecord(
+        scrape_date, name, "WR", rank, rank, "FA", source, 27.0, 18, 450.0, f"{scrape_date}T17:00"
+    )
+
+
+def test_same_day_rerun_replaces_the_snapshot(temp_db_path) -> None:
+    """Regression: a manual rerun on 2026-10-25 left a player from the earlier run behind."""
+
+    conn = create_connection(temp_db_path)
+    insert_player_data(
+        conn,
+        [
+            _snapshot_player("2026-10-25", "Harrison Bryant", 462),
+            _snapshot_player("2026-10-25", "Ray-Ray McCloud", 463),
+            _snapshot_player("2026-10-25", "Tyler Johnson", 464),
+        ],
+    )
+    ids_before = dict(conn.execute("SELECT player_name, id FROM ktc_rankings").fetchall())
+
+    insert_player_data(
+        conn,
+        [
+            _snapshot_player("2026-10-25", "Tyler Johnson", 462),
+            _snapshot_player("2026-10-25", "Harrison Bryant", 463),
+            _snapshot_player("2026-10-25", "Terrell Jennings", 464),
+        ],
+    )
+    rows = conn.execute(
+        "SELECT player_name, rank_overall, id FROM ktc_rankings ORDER BY rank_overall"
+    ).fetchall()
+    conn.close()
+
+    assert [(name, rank) for name, rank, _ in rows] == [
+        ("Tyler Johnson", 462),
+        ("Harrison Bryant", 463),
+        ("Terrell Jennings", 464),
+    ]
+    surviving_ids = {name: row_id for name, _, row_id in rows if name in ids_before}
+    assert surviving_ids == {
+        "Tyler Johnson": ids_before["Tyler Johnson"],
+        "Harrison Bryant": ids_before["Harrison Bryant"],
+    }
+
+
+def test_snapshot_replace_leaves_other_dates_and_sources_alone(temp_db_path) -> None:
+    conn = create_connection(temp_db_path)
+    insert_player_data(
+        conn,
+        [
+            _snapshot_player("2026-10-24", "Ray-Ray McCloud", 460),
+            _snapshot_player("2026-10-25", "Ray-Ray McCloud", 463, source="other-source"),
+            _snapshot_player("2026-10-25", "Ray-Ray McCloud", 463),
+        ],
+    )
+
+    insert_player_data(conn, [_snapshot_player("2026-10-25", "Harrison Bryant", 463)])
+    rows = conn.execute(
+        "SELECT scrape_date, source, player_name FROM ktc_rankings ORDER BY scrape_date, source"
+    ).fetchall()
+    conn.close()
+
+    assert rows == [
+        ("2026-10-24", "keeptradecut", "Ray-Ray McCloud"),
+        ("2026-10-25", "keeptradecut", "Harrison Bryant"),
+        ("2026-10-25", "other-source", "Ray-Ray McCloud"),
+    ]
+
+
+def test_failed_batch_rolls_back_the_prune(temp_db_path, monkeypatch) -> None:
+    conn = create_connection(temp_db_path)
+    insert_player_data(conn, [_snapshot_player("2026-10-25", "Ray-Ray McCloud", 463)])
+
+    def broken_upsert_sql(dialect):
+        return "INSERT INTO no_such_table VALUES (1)"
+
+    monkeypatch.setattr("ktc_webscraping.load.upsert_sql", broken_upsert_sql)
+    with pytest.raises(sqlite3.OperationalError):
+        insert_player_data(conn, [_snapshot_player("2026-10-25", "Harrison Bryant", 463)])
+
+    names = conn.execute("SELECT player_name FROM ktc_rankings").fetchall()
+    conn.close()
+    assert names == [("Ray-Ray McCloud",)]
