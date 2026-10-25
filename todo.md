@@ -9,13 +9,13 @@ Turn this repo into a credible proof project for remote QA / SDET / Quality Engi
 
 ## Current Status
 
-As of 2026-10-19:
+As of 2026-10-25:
 
-- Phases 0–5 and 7–9 are complete; the finish-up phases (11–15, below) are complete or in review
-- 114 deterministic tests, 98% coverage over every module (including Selenium extract), 90% gate in CI
-- The daily scheduled scrape is green (500 rankings per run) and now accumulates history through the Actions cache
-- Postgres load path is built and integration-tested in CI; the scheduled scrape intentionally stays on SQLite for now
-- Phase 10 is complete; the remaining open items are on hold by decision (hosted database) or personal (rehearsal)
+- Phases 0–5, 7–16 and the hardening pass (17–27, below) are complete; Phase 6 is partly on hold by decision
+- 203 deterministic tests (30 against Postgres), 99% coverage over every module, 90% gate in CI; `main` requires a green CI check
+- Every scheduled scrape since Oct 1 has succeeded; each run passes a quality gate before anything is stored or published
+- The published artifact is a one-snapshot contract with a downstream app, which is notified by `repository_dispatch` and syncs within seconds
+- Remaining open items: hosted Postgres for the daily job (on hold), and interview rehearsal (personal)
 
 ---
 
@@ -189,7 +189,7 @@ Purpose: turn the current refactor plus deterministic tests into visible, recrui
 - [X] Decide persistence path for automation:
   - ~~CSV commit-back approach~~ (not chosen: database-backed persistence instead)
 - [X] or database-backed persistence
-- [ ] Handle secrets securely if external services are used (on hold: no external services while the scheduled scrape stays on SQLite; database passwords are already masked in logs)
+- [X] Handle secrets securely if external services are used (the downstream dispatch token and repo name are GitHub Secrets, and database passwords are masked in logs)
 - [X] Add basic logging / output visibility for scheduled runs
 - [X] Verify workflow can run without manual intervention
 
@@ -294,6 +294,26 @@ Status (2026-10-19): the Postgres load path is complete and tested in CI against
 - [X] Phase 14: `pyproject.toml` package with `ktc-scrape` entry point and extras; `uv`-generated lock with a 14-day release cooldown (PR #13)
 - [X] Phase 15: README rewritten for hiring-manager readers with relative links and an architecture diagram (PR #14)
 - [X] Phase 16: Postgres load path with SQLite/Postgres dialects, `postgres` extra, 7 integration tests against a CI service container that fail loudly if it's missing
+
+---
+
+## Phases 17–27 - Hardening Pass (October 2026)
+
+Prompted by a downstream app that consumes the scheduled-scrape artifact, then by a review of what could still fail silently.
+
+- [X] Phase 17: `todo.md` close-out (PR #16)
+- [X] Phase 18: the published artifact is one snapshot again, with full history shipped as a separate `ktc-history` artifact; summary Top 10 fixed (PR #17)
+- [X] Phase 19: a same-day rerun replaces that day's snapshot instead of mixing runs (PR #18)
+- [X] Phase 20: actions pinned by commit SHA, Dependabot for GitHub Actions, `runpy` test warning fixed (PR #19)
+- [X] Phase 21: quality gate rejects degraded runs before storing or publishing anything (exit 3) (PR #20)
+- [X] Phase 22: history restored from the newest `ktc-history` artifact when the cache misses (PR #21)
+- [X] Phase 23: players keyed by KeepTradeCut id with an in-place migration; one automatic re-scrape when the gate fails, after it caught a live mid-scrape ranking shift (PR #22)
+- [X] Phase 24: API reads Postgres as well as SQLite, with every API test run on both; headless dashboard tests (PR #23)
+- [X] Phase 25: `repository_dispatch` notifies the downstream app as soon as a snapshot is published (PR #24, plus the consumer's PR #23)
+- [X] Phase 26: GitHub Actions major upgrades via Dependabot (PR #25)
+- [X] Phase 27: `make lock` now upgrades; lock refreshed; Dependabot pip updates removed because per-pin bumps broke the resolver lock (PR #27)
+- [X] Branch protection on `main`: PR plus green CI required
+- [X] Verified end to end on 2026-10-25: scrape, gate, migration, publish, dispatch, and the consumer's sync and commit
 
 ---
 
