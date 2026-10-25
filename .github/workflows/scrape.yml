@@ -25,10 +25,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
           cache: "pip"
@@ -47,7 +47,7 @@ jobs:
       # Keep this path unchanged: the cache version depends on it, and moving it
       # would orphan the existing history.
       - name: Restore historical database
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: artifacts/ktc.db
           key: ktc-db-${{ github.run_id }}
@@ -68,7 +68,7 @@ jobs:
         run: python -m ktc_webscraping.export --history artifacts/ktc.db --output-dir publish
 
       - name: Upload scrape artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: scheduled-scrape-${{ github.run_id }}
           path: publish/
@@ -76,7 +76,7 @@ jobs:
           retention-days: 14
 
       - name: Upload history database
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ktc-history-${{ github.run_id }}
           path: artifacts/ktc.db

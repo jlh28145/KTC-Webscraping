@@ -1,4 +1,5 @@
 import runpy
+import sys
 from importlib import metadata
 from pathlib import Path
 
@@ -365,6 +366,9 @@ def test_main_returns_zero_and_prints_help_for_help_flag(capsys) -> None:
 def test_cli_module_main_block_raises_system_exit(monkeypatch) -> None:
     monkeypatch.setattr("sys.argv", ["ktc_webscraping.cli", "--help"])
 
+    # Run the module fresh, as `python -m` would; re-executing an already-imported
+    # module makes runpy warn about unpredictable behaviour.
+    monkeypatch.delitem(sys.modules, "ktc_webscraping.cli")
     with pytest.raises(SystemExit) as exc_info:
         runpy.run_module("ktc_webscraping.cli", run_name="__main__")
 
