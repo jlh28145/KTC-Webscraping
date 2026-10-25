@@ -18,12 +18,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
-from .models import PlayerRecord, ScrapeConfig
+from .models import HTML_PARSER, PlayerRecord, ScrapeConfig, ScrapeResult
 from .transform import (
-    parse_player_rows,
     parse_player_rows_from_text,
+    parse_player_rows_with_parser,
     parse_player_text_lines,
 )
+
+PageRecords = tuple[list[PlayerRecord], str]
 
 DEFAULT_BASE_URL = (
     "https://keeptradecut.com/dynasty-rankings?page={page}&filters=QB|WR|RB|TE|RDP&format=2"
@@ -181,8 +183,13 @@ def extract_page_records(
     scrape_timestamp: str,
     row_count_tolerance: int = 0,
     row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
-) -> list[PlayerRecord]:
-    """Extract ranking records from one page using DOM and text-layout fallbacks."""
+) -> PageRecords:
+    """Extract one page's records and name the parser that produced them.
+
+    The HTML row parser comes first; the text-layout and live-DOM fallbacks keep
+    an old or partially rendered layout readable, and the parser name lets the
+    quality gate flag a run that silently depended on them.
+    """
 
     page_html = load_page_html(
         driver,
@@ -193,9 +200,9 @@ def extract_page_records(
         row_count_tolerance,
         row_count_poll_timeout,
     )
-    records = parse_player_rows(page_html, scrape_timestamp)
+    records, parser = parse_player_rows_with_parser(page_html, scrape_timestamp)
     if records:
-        return records
+        return records, parser
 
     row_elements = driver.find_elements(By.CSS_SELECTOR, "#rankings-page-rankings .onePlayer")
     dom_records = [
@@ -208,7 +215,7 @@ def extract_page_records(
         if record is not None
     ]
     if dom_records:
-        return dom_records
+        return dom_records, "dom-row-text"
 
     try:
         container_text = driver.find_element(By.ID, "rankings-page-rankings").text
@@ -218,7 +225,7 @@ def extract_page_records(
     if container_text:
         text_records = parse_player_rows_from_text(container_text.splitlines(), scrape_timestamp)
         if text_records:
-            return text_records
+            return text_records, "dom-container-text"
 
     title = driver.title
     current_url = driver.current_url
@@ -240,7 +247,7 @@ def extract_page_records_with_retry(
     retry_attempts: int,
     row_count_tolerance: int = 0,
     row_count_poll_timeout: int = DEFAULT_ROW_COUNT_POLL_TIMEOUT,
-) -> list[PlayerRecord]:
+) -> PageRecords:
     """Retry page extraction a bounded number of times before failing the run."""
 
     total_attempts = retry_attempts + 1
@@ -277,7 +284,7 @@ def extract_page_records_with_retry(
     ) from last_error
 
 
-def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerRecord]:
+def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> ScrapeResult:
     """Scrape all configured pages and return normalized player records.
 
     Pages are requested with a small delay (plus jitter) between them to
@@ -296,12 +303,13 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
     driver, wait = build_driver(headless=headless)
     all_players: list[PlayerRecord] = []
     failed_pages: list[int] = []
+    fallback_pages: dict[int, str] = {}
 
     try:
         for page in range(config.page_count):
             LOGGER.info("Scraping page %s of %s", page + 1, config.page_count)
             try:
-                page_rows = extract_page_records_with_retry(
+                page_rows, parser = extract_page_records_with_retry(
                     driver=driver,
                     wait=wait,
                     page_number=page,
@@ -318,7 +326,14 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
                 continue
 
             all_players.extend(page_rows)
-            LOGGER.info("Parsed %s rows from page %s", len(page_rows), page + 1)
+            LOGGER.info("Parsed %s rows from page %s (%s)", len(page_rows), page + 1, parser)
+            if parser != HTML_PARSER:
+                fallback_pages[page + 1] = parser
+                LOGGER.warning(
+                    "Page %s was parsed by the %r fallback; the site layout may have changed",
+                    page + 1,
+                    parser,
+                )
 
             is_last_page = page == config.page_count - 1
             if not is_last_page and config.page_delay_seconds > 0:
@@ -341,4 +356,9 @@ def scrape_rankings(config: ScrapeConfig, headless: bool = True) -> list[PlayerR
             f"Failed pages: {failed_pages}"
         )
 
-    return all_players
+    return ScrapeResult(
+        records=all_players,
+        page_count=config.page_count,
+        failed_pages=failed_pages,
+        fallback_pages=fallback_pages,
+    )

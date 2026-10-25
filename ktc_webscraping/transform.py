@@ -217,7 +217,15 @@ def parse_player_rows_from_text(lines: list[str], scrape_timestamp: str) -> list
     return players
 
 
-def parse_player_rows(page_html: str, scrape_timestamp: str) -> list[PlayerRecord]:
+def parse_player_rows_with_parser(
+    page_html: str, scrape_timestamp: str
+) -> tuple[list[PlayerRecord], str]:
+    """Parse a page and name the parser that produced the records.
+
+    ``"html"`` is the primary row parser; ``"html-text"`` means no row matched
+    and the page text was parsed instead, which usually signals a layout change.
+    """
+
     soup = BeautifulSoup(page_html, "html.parser")
     player_rows = soup.select("#rankings-page-rankings .onePlayer")
 
@@ -228,6 +236,13 @@ def parse_player_rows(page_html: str, scrape_timestamp: str) -> list[PlayerRecor
             players.append(record)
 
     if players:
-        return players
+        return players, "html"
 
-    return parse_player_rows_from_text(extract_rankings_text_lines(page_html), scrape_timestamp)
+    text_records = parse_player_rows_from_text(
+        extract_rankings_text_lines(page_html), scrape_timestamp
+    )
+    return text_records, "html-text"
+
+
+def parse_player_rows(page_html: str, scrape_timestamp: str) -> list[PlayerRecord]:
+    return parse_player_rows_with_parser(page_html, scrape_timestamp)[0]

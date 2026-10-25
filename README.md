@@ -90,7 +90,8 @@ The live website is the least dependable part of the system, so it's the one thi
 | Load (SQLite) | 22 | Real SQLite in `tmp_path`: schema, unique index, upserts, history across dates, validation failures, per-dialect SQL |
 | Load (Postgres) | 7 | Real `postgres:17` service container in CI: schema parity, type round-trips, upserts, history, CLI end-to-end. Skipped locally unless `KTC_TEST_POSTGRES_URL` is set, and a **hard failure** in CI if the URL is missing, so the tests can't silently skip |
 | API | 24 | FastAPI `TestClient` against a seeded two-snapshot database: filters, pagination, input validation, and 404/422/501/503 paths |
-| CLI and config | 26 | Argument parsing, environment defaults, exit codes, and the installed `ktc-scrape` entry point |
+| CLI and config | 33 | Argument parsing, environment defaults, exit codes, the quality gate's accept/reject/override paths, and the installed `ktc-scrape` entry point |
+| Quality gate | 11 | Each check on its own: failed pages, fallback parsers, the row floor, duplicate players and ranks |
 
 Coverage is enforced at 90% over **every** module, including the Selenium layer (currently about 98%). Coverage is a floor, not the goal: tests target behaviors that broke, or could break, against the live site.
 
@@ -101,7 +102,7 @@ Coverage is enforced at 90% over **every** module, including the Selenium layer 
 **[`scrape.yml`](.github/workflows/scrape.yml)** runs daily (13:00 UTC) or on manual dispatch:
 
 1. Restores the previous run's database from the Actions cache, so `ktc_rankings` keeps building history.
-2. Runs `ktc-scrape` for 10 pages (about 500 rankings).
+2. Runs `ktc-scrape` for 10 pages (about 500 rankings). A **quality gate** rejects a degraded run before anything is stored: failed pages, pages read by a fallback parser, fewer than 98% of the expected rows, or duplicate players or ranks. The job then fails (exit 3) and publishes nothing, so downstream consumers keep the last good snapshot.
 3. Publishes two artifacts, each kept for 14 days:
    - `scheduled-scrape-<run id>`: `ktc.db` with **only the latest snapshot**, plus `scrape_summary.txt` (row counts, history size, top 10). This is a contract: a downstream repo downloads the newest one daily and commits its `ktc.db`, so the file stays one snapshot (about 95 KB) instead of growing every day.
    - `ktc-history-<run id>`: the full history database.
@@ -121,6 +122,7 @@ Most of these came from failures observed on the live site or in scheduled runs;
 | Selenium timeouts bypassed the retry loop and ended the run | Retries cover `TimeoutException` and `WebDriverException` as well as parse failures |
 | The site redesigned its row markup and the HTML parser silently matched nothing | The parser handles both layouts, and a golden-file test on captured live markup guards against the next change |
 | Pages that never populate | Anti-bot markers (captcha, Cloudflare, …) are detected and reported in the failure message |
+| Retries, skips and fallbacks kept a degraded run green, and its artifact became what downstream synced | A quality gate rejects the run instead (exit 3, nothing stored or published); `--allow-degraded` is a deliberate manual override |
 
 ## Configuration
 
@@ -137,7 +139,7 @@ Environment variables (see [`.env.example`](.env.example)) set the defaults, and
 
 To load into Postgres instead of SQLite, run `ktc-scrape --database-url postgresql://user:pass@host/db`.
 
-Run `ktc-scrape --help` for the tuning flags (`--row-count-tolerance`, `--row-count-poll-timeout`, `--page-delay-seconds`, `--headed`, …).
+Run `ktc-scrape --help` for the tuning flags (`--row-count-tolerance`, `--row-count-poll-timeout`, `--page-delay-seconds`, `--min-row-ratio`, `--allow-degraded`, `--headed`, …).
 
 ## Data model
 
