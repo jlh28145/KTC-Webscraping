@@ -18,7 +18,7 @@ The scraper is the easy part. This repo is a quality-engineering project. It sho
 - **Unattended scheduled runs.** A daily GitHub Actions job scrapes about 500 rankings, carries the database forward between runs to build history, and publishes a stable one-snapshot artifact for a downstream repo.
 - **Resilience learned from production.** Retries, pacing and per-page failure isolation were each added in response to observed live-site behavior, and each one has a regression test (see [Reliability design](#reliability-design)).
 - **Portable persistence.** One schema and one idempotent upsert run on SQLite locally and on Postgres. The Postgres path is integration-tested in CI against a real `postgres:17` service container.
-- **Reproducible environments.** Dependencies are declared in `pyproject.toml` and locked with `uv`, skipping releases newer than 14 days.
+- **Reproducible environments.** Dependencies are declared in `pyproject.toml` and locked with `uv`, skipping releases newer than 14 days. `make lock` refreshes the whole lock through the resolver, and Dependabot keeps the SHA-pinned GitHub Actions current.
 
 ## Architecture
 
