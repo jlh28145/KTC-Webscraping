@@ -1,0 +1,26 @@
+# Dependency updates, matching the lock's policy of skipping releases newer than
+# 14 days (see `make lock`). Updates arrive grouped, one PR per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+
+  # Actions are pinned by commit SHA; Dependabot bumps the SHA and its version comment.
+  # Note: a new actions/cache major can change the cache version and miss the stored
+  # history; the scheduled scrape then restores it from the latest ktc-history artifact.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 14
+    groups:
+      github-actions:
+        patterns: ["*"]
