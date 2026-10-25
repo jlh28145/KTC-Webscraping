@@ -1,3 +1,5 @@
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,28 +34,65 @@ def _record(
     )
 
 
-@pytest.fixture
-def seeded_db(monkeypatch, tmp_path: Path) -> Path:
-    """Two snapshots: Gibbs moves from 2nd to 1st between 2026-10-18 and 2026-10-19."""
+POSTGRES_URL = os.getenv("KTC_TEST_POSTGRES_URL")
 
-    db_path = tmp_path / "api.db"
-    conn = create_connection(db_path)
-    insert_player_data(
-        conn,
-        [
-            _record("2026-10-18", "Josh Allen", "QB", 1, "BUF", 1, 9999.0),
-            _record("2026-10-18", "Jahmyr Gibbs", "RB", 2, "DET", 1, 9990.0),
-            _record("2026-10-19", "Jahmyr Gibbs", "RB", 1, "DET", 1, 9999.0),
-            _record("2026-10-19", "Josh Allen", "QB", 2, "BUF", 1, 9995.0),
-            _record("2026-10-19", "2027 Late 1st", "PICK", None, None, 4, 5000.0),
-            _record("2026-10-19", "2027 Early 1st", "PICK", None, None, 3, 6871.0),
-            _record("2026-10-19", "Travis Kelce", "TE", 3, "KCC", 2, 7000.0),
-        ],
-    )
+
+def _drop_postgres_rankings() -> None:
+    import psycopg
+
+    with psycopg.connect(POSTGRES_URL, autocommit=True) as conn:
+        conn.execute("DROP TABLE IF EXISTS ktc_rankings")
+
+
+@pytest.fixture(
+    params=[
+        "sqlite",
+        pytest.param(
+            "postgres",
+            marks=pytest.mark.skipif(
+                not POSTGRES_URL, reason="set KTC_TEST_POSTGRES_URL to run the API on Postgres"
+            ),
+        ),
+    ]
+)
+def backend(request) -> str:
+    return request.param
+
+
+@pytest.fixture
+def seeded_db(backend: str, monkeypatch, tmp_path: Path):
+    """Two snapshots: Gibbs moves from 2nd to 1st between 2026-10-18 and 2026-10-19.
+
+    Every test using this fixture runs once per backend (SQLite, and Postgres
+    when KTC_TEST_POSTGRES_URL is set), so the API is held to the same answers on both.
+    """
+
+    records = [
+        _record("2026-10-18", "Josh Allen", "QB", 1, "BUF", 1, 9999.0),
+        _record("2026-10-18", "Jahmyr Gibbs", "RB", 2, "DET", 1, 9990.0),
+        _record("2026-10-19", "Jahmyr Gibbs", "RB", 1, "DET", 1, 9999.0),
+        _record("2026-10-19", "Josh Allen", "QB", 2, "BUF", 1, 9995.0),
+        _record("2026-10-19", "2027 Late 1st", "PICK", None, None, 4, 5000.0),
+        _record("2026-10-19", "2027 Early 1st", "PICK", None, None, 3, 6871.0),
+        _record("2026-10-19", "Travis Kelce", "TE", 3, "KCC", 2, 7000.0),
+    ]
+    if backend == "sqlite":
+        db_path = tmp_path / "api.db"
+        conn = create_connection(db_path)
+        insert_player_data(conn, records)
+        conn.close()
+        monkeypatch.delenv("KTC_DATABASE_URL", raising=False)
+        monkeypatch.setenv("KTC_DB_PATH", str(db_path))
+        yield db_path
+        return
+
+    _drop_postgres_rankings()
+    conn = create_connection(tmp_path / "unused.db", database_url=POSTGRES_URL)
+    insert_player_data(conn, records)
     conn.close()
-    monkeypatch.delenv("KTC_DATABASE_URL", raising=False)
-    monkeypatch.setenv("KTC_DB_PATH", str(db_path))
-    return db_path
+    monkeypatch.setenv("KTC_DATABASE_URL", POSTGRES_URL)
+    yield None
+    _drop_postgres_rankings()
 
 
 @pytest.fixture
@@ -104,6 +143,8 @@ def test_rankings_returns_typed_rows(seeded_db, client) -> None:
         "tier",
         "value",
         "scraped_at",
+        "ktc_player_id",
+        "player_key",
     }
     assert row["rank_overall"] == 1
     assert row["value"] == 9999.0
@@ -212,17 +253,44 @@ def test_database_without_rankings_table_returns_503(monkeypatch, tmp_path: Path
 
 
 def test_database_url_takes_precedence_over_db_path(
-    seeded_db, monkeypatch, tmp_path: Path, client
+    seeded_db, backend, monkeypatch, tmp_path: Path, client
 ) -> None:
+    if backend != "sqlite":
+        pytest.skip("checks SQLite path resolution")
     monkeypatch.setenv("KTC_DB_PATH", str(tmp_path / "ignored.db"))
     monkeypatch.setenv("KTC_DATABASE_URL", f"sqlite:///{seeded_db}")
 
     assert client.get("/scrape-dates").status_code == 200
 
 
-def test_postgres_url_returns_501(monkeypatch, client) -> None:
-    monkeypatch.setenv("KTC_DATABASE_URL", "postgresql://user:pw@localhost:5432/ktc")
+def test_unreachable_postgres_returns_503_without_leaking_the_password(monkeypatch, client) -> None:
+    monkeypatch.setenv("KTC_DATABASE_URL", "postgresql://ktc:s3cret@127.0.0.1:1/ktc")
+
+    response = client.get("/rankings")
+
+    assert response.status_code == 503
+    assert response.json() == {
+        "detail": "Database unavailable at postgresql://ktc:***@127.0.0.1:1/ktc"
+    }
+
+
+def test_postgres_without_the_driver_returns_501(monkeypatch, client) -> None:
+    monkeypatch.setitem(sys.modules, "psycopg", None)
+    monkeypatch.setenv("KTC_DATABASE_URL", "postgresql://ktc:pw@127.0.0.1:1/ktc")
 
     response = client.get("/rankings")
 
     assert response.status_code == 501
+    assert "pip install 'ktc-webscraping[postgres]'" in response.json()["detail"]
+
+
+def test_postgres_database_without_rankings_table_returns_503(monkeypatch, client) -> None:
+    if not POSTGRES_URL:
+        pytest.skip("set KTC_TEST_POSTGRES_URL to run the API on Postgres")
+    _drop_postgres_rankings()
+    monkeypatch.setenv("KTC_DATABASE_URL", POSTGRES_URL)
+
+    response = client.get("/scrape-dates")
+
+    assert response.status_code == 503
+    assert "no ktc_rankings table" in response.json()["detail"]
